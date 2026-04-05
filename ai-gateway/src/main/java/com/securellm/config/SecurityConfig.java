@@ -4,7 +4,10 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
+import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.security.web.server.SecurityWebFilterChain;
+import reactor.core.publisher.Mono;
+import org.springframework.security.oauth2.jwt.Jwt;
 
 @Configuration
 @EnableWebFluxSecurity
@@ -16,16 +19,22 @@ public class SecurityConfig {
             .authorizeExchange(exchanges -> exchanges
                 .anyExchange().authenticated()
             )
-            .oauth2ResourceServer(oauth2 -> oauth2
-                .jwt(jwt -> jwt
-                    .decoder(jwtDecoder())
-                )
-            );
+                .oauth2ResourceServer(oauth2 -> oauth2
+                        .jwt(jwt -> jwt
+                                // Change '.decoder(' to '.jwtDecoder('
+                                .jwtDecoder(jwtDecoder())
+                        )
+                );
         return http.build();
     }
 
     // Placeholder for JWT decoder - would be implemented based on your CIAM
-    private org.springframework.security.oauth2.jwt.ReactiveJwtDecoder jwtDecoder() {
-        return null;
+    @Bean
+     org.springframework.security.oauth2.jwt.ReactiveJwtDecoder jwtDecoder()
+    {
+        return (String token) -> {
+            return Mono.error(new JwtException("Decoder not yet implemented"));
+        };
+
     }
 }
