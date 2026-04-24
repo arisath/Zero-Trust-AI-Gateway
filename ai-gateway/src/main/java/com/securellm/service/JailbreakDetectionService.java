@@ -43,7 +43,7 @@ public class JailbreakDetectionService {
             "act\\s+as\\s+(if\\s+you\\s+have\\s+no\\s+restrictions|an?\\s+AI\\s+without)",
             Pattern.CASE_INSENSITIVE),
         Pattern.compile(
-            "simulate\\s+(a\\s+)?(?:unrestricted|uncensored|unfiltered)\\s+AI",
+            "simulate\\s+(?:an?\\s+)?(?:unrestricted|uncensored|unfiltered)\\s+AI",
             Pattern.CASE_INSENSITIVE),
 
         // Restriction / safety bypass

@@ -1,5 +1,6 @@
 package com.securellm.controller;
 
+import com.securellm.service.BlocklistService;
 import com.securellm.service.JailbreakDetectionService;
 import com.securellm.service.LlmService;
 import com.securellm.service.PiiDetectionService;
@@ -32,14 +33,17 @@ public class ChatController {
     private static final Logger log = LoggerFactory.getLogger(ChatController.class);
 
     private final LlmService llmService;
+    private final BlocklistService blocklistService;
     private final JailbreakDetectionService jailbreakDetectionService;
     private final PiiDetectionService piiDetectionService;
 
     public ChatController(
             LlmService llmService,
+            BlocklistService blocklistService,
             JailbreakDetectionService jailbreakDetectionService,
             PiiDetectionService piiDetectionService) {
         this.llmService = llmService;
+        this.blocklistService = blocklistService;
         this.jailbreakDetectionService = jailbreakDetectionService;
         this.piiDetectionService = piiDetectionService;
     }
@@ -51,6 +55,12 @@ public class ChatController {
     public Mono<ChatResponse> chat(@RequestBody ChatRequest request) {
         if (request.prompt() == null || request.prompt().isBlank()) {
             return Mono.error(new ResponseStatusException(HttpStatus.BAD_REQUEST, "prompt is required"));
+        }
+
+        if (blocklistService.isBlocked(request.prompt())) {
+            log.warn("Blocklist match '{}' blocked in /api/chat", blocklistService.matchedTerm(request.prompt()));
+            return Mono.error(new ResponseStatusException(
+                HttpStatus.FORBIDDEN, "Request blocked by security policy."));
         }
 
         if (jailbreakDetectionService.isJailbreakAttempt(request.prompt())) {

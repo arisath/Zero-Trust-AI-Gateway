@@ -1,5 +1,6 @@
 package com.securellm.filter;
 
+import com.securellm.service.BlocklistService;
 import com.securellm.service.JailbreakDetectionService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,15 +20,12 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 
 /**
- * Inspects the inbound request body for prompt-injection / jailbreak patterns.
+ * Inspects the inbound request body for:
+ *  1. Blocklisted words/phrases ({@link BlocklistService})
+ *  2. Prompt injection / jailbreak patterns ({@link JailbreakDetectionService})
  *
- * Flow:
- *  1. Buffer the entire request body reactively.
- *  2. Run it through {@link JailbreakDetectionService}.
- *  3. If flagged → return 403 Forbidden immediately.
- *  4. If clean  → re-wrap the body (so downstream filters can read it) and continue.
- *
- * Requests with no body (GET, etc.) are passed through unchanged.
+ * Either check triggering returns 403 Forbidden immediately.
+ * Blocklist is checked first as it is the cheaper operation.
  * Errors during body-reading are logged and treated as pass-through (fail-open).
  */
 @Component
@@ -38,10 +36,12 @@ public class JailbreakClassifierFilter extends AbstractGatewayFilterFactory<Jail
         "{\"error\":\"Request blocked by security policy.\"}".getBytes(StandardCharsets.UTF_8);
 
     private final JailbreakDetectionService detector;
+    private final BlocklistService blocklistService;
 
-    public JailbreakClassifierFilter(JailbreakDetectionService detector) {
+    public JailbreakClassifierFilter(JailbreakDetectionService detector, BlocklistService blocklistService) {
         super(Config.class);
         this.detector = detector;
+        this.blocklistService = blocklistService;
     }
 
     @Override
@@ -59,16 +59,18 @@ public class JailbreakClassifierFilter extends AbstractGatewayFilterFactory<Jail
                     DataBufferUtils.release(dataBuffer);
 
                     String body = new String(bytes, StandardCharsets.UTF_8);
+                    String remote = remoteAddr(exchange);
+
+                    if (blocklistService.isBlocked(body)) {
+                        log.warn("Blocklist match '{}' — remote={} path={}",
+                            blocklistService.matchedTerm(body), remote, exchange.getRequest().getPath());
+                        return reject(exchange);
+                    }
 
                     if (detector.isJailbreakAttempt(body)) {
-                        String remote = remoteAddr(exchange);
                         log.warn("Jailbreak attempt detected — remote={} path={}",
                             remote, exchange.getRequest().getPath());
-                        exchange.getResponse().setStatusCode(HttpStatus.FORBIDDEN);
-                        exchange.getResponse().getHeaders().setContentType(MediaType.APPLICATION_JSON);
-                        DataBuffer errorBuffer =
-                            exchange.getResponse().bufferFactory().wrap(BLOCKED_BODY);
-                        return exchange.getResponse().writeWith(Mono.just(errorBuffer));
+                        return reject(exchange);
                     }
 
                     // Re-wrap the consumed body so the next filter / downstream can read it
@@ -86,6 +88,13 @@ public class JailbreakClassifierFilter extends AbstractGatewayFilterFactory<Jail
                     return chain.filter(exchange); // fail-open
                 });
         };
+    }
+
+    private Mono<Void> reject(org.springframework.web.server.ServerWebExchange exchange) {
+        exchange.getResponse().setStatusCode(HttpStatus.FORBIDDEN);
+        exchange.getResponse().getHeaders().setContentType(MediaType.APPLICATION_JSON);
+        DataBuffer errorBuffer = exchange.getResponse().bufferFactory().wrap(BLOCKED_BODY);
+        return exchange.getResponse().writeWith(Mono.just(errorBuffer));
     }
 
     private String remoteAddr(org.springframework.web.server.ServerWebExchange exchange) {
