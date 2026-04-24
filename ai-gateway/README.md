@@ -1,125 +1,195 @@
-# Secure LLM Gateway
+# Zero-Trust AI Gateway
 
 ## Overview
 
-A production-grade gateway for secure LLM interactions built with Spring Boot and LangChain4j. This gateway implements multi-layer security to protect LLM services from various threats while providing efficient routing and rate limiting.
+A Spring Boot / Spring Cloud Gateway application that sits in front of LLM services and enforces multiple security layers on every request and response. All traffic — regardless of source — is treated as untrusted and must pass through the full filter chain before reaching the model and before any response is returned to the caller.
 
 ## Architecture
 
-This gateway implements a filter chain approach to secure LLM interactions with three core security filters:
+```
+Client
+  │
+  ▼
+[OAuth2 / JWT Auth]           ← prod profile only (JWKS-validated)
+  │
+  ▼
+[TokenGuardFilter]            ← per-user request/token rate limiting (Redis)
+  │
+  ▼
+[JailbreakClassifierFilter]   ← prompt injection / jailbreak detection
+  │
+  ▼
+[Spring Cloud Gateway Router]
+  ├─ /api/llm/**       → lb://llm-service
+  └─ /api/secure-llm/** → lb://secure-llm
+  │
+  ▼
+[Downstream LLM / Ollama]
+  │
+  ▼
+[PiiRedactorFilter]           ← PII redaction on the response
+  │
+  ▼
+Client
+```
 
-1. **PII Redactor Filter** - Outbound security that scans for and redacts personally identifiable information
-2. **Jailbreak Classifier Filter** - Inbound security that detects prompt injection attempts using a local small language model
-3. **Token Guard & Rate Limiter** - Prevents abuse and ensures fair usage with rate limiting and token tracking
+A direct `/api/chat` endpoint is also available, which calls Ollama directly (bypassing the proxy routes) and applies the same jailbreak and PII logic inline.
 
 ## Tech Stack
 
-- **Framework**: Spring Boot 3.x
-- **Gateway Engine**: Spring Cloud Gateway
-- **LLM Orchestration**: LangChain4j (supports OpenAI, Gemini, Ollama, etc.)
-- **Security**: Spring Security with OAuth2/OIDC
-- **PII Detection**: Apache OpenNLP
-- **Rate Limiting**: Resilience4j with Redis
-- **Monitoring**: Spring Boot Actuator
+| Layer | Technology |
+|---|---|
+| Framework | Spring Boot 3.2.4 + Spring Cloud Gateway (WebFlux / Netty) |
+| Security | Spring Security OAuth2 Resource Server + JWT (JWKS) |
+| LLM | Ollama (native `/api/chat` endpoint) |
+| Rate limiting | Redis Reactive (sliding-window, per-user) |
+| Resilience | Resilience4j circuit breaker |
+| Observability | Spring Boot Actuator + Micrometer + Prometheus |
+| Containers | Docker (OpenJDK 17 slim) |
 
 ## Project Structure
 
 ```
 ai-gateway/
-├── src/
-│   ├── main/
-│   │   ├── java/
-│   │   │   └── com/securellm/
-│   │   │       ├── GatewayApplication.java
-│   │   │       ├── config/
-│   │   │       │   ├── GatewayConfig.java
-│   │   │       │   └── SecurityConfig.java
-│   │   │       ├── controller/
-│   │   │       │   └── ConnectivityController.java
-│   │   │       ├── filter/
-│   │   │       │   ├── PiiRedactorFilter.java
-│   │   │       │   ├── JailbreakClassifierFilter.java
-│   │   │       │   └── TokenGuardFilter.java
-│   │   │       ├── service/
-│   │   │       │   ├── PiiDetectionService.java
-│   │   │       │   ├── LlmService.java
-│   │   │       │   └── TokenUsageService.java
-│   │   │       └── util/
-│   │   │           └── SecurityUtils.java
-│   │   └── resources/
-│   │       ├── application.yml
-│   │       └── application-local.yml
-│   └── test/
-│       └── java/
-│           └── com/securellm/
-│               └── GatewayApplicationTests.java
-├── pom.xml
-├── README.md
-├── Dockerfile
-└── build.sh
+├── src/main/java/com/securellm/
+│   ├── GatewayApplication.java
+│   ├── config/
+│   │   ├── GatewayConfig.java          # routes + filter chain wiring
+│   │   ├── SecurityConfig.java         # JWT / JWKS auth (prod profile)
+│   │   ├── LocalSecurityConfig.java    # auth disabled (local profile)
+│   │   └── RedisConfig.java            # ReactiveRedisTemplate bean
+│   ├── controller/
+│   │   ├── ChatController.java         # POST /api/chat (direct Ollama call)
+│   │   └── ConnectivityController.java # GET  /api/v1/check-connectivity
+│   ├── filter/
+│   │   ├── TokenGuardFilter.java
+│   │   ├── JailbreakClassifierFilter.java
+│   │   └── PiiRedactorFilter.java
+│   └── service/
+│       ├── LlmService.java             # Ollama WebClient wrapper
+│       ├── JailbreakDetectionService.java
+│       ├── PiiDetectionService.java
+│       └── TokenUsageService.java
+└── src/main/resources/
+    ├── application.yaml                # base config (all profiles)
+    └── application-prod.yaml           # prod-only: JWT issuer / JWKS URI
 ```
 
-## Core Features
+## Security Layers
 
-- Multi-layer security for LLM interactions
-- PII detection and redaction
-- Jailbreak prompt detection using local SLM
-- Token usage tracking and rate limiting
-- Integration with multiple LLM providers (OpenAI, Gemini, Ollama)
-- Resilience patterns for high availability
-- Comprehensive monitoring and metrics
+### 1. Authentication (prod only)
+JWT Bearer tokens validated against your identity provider's JWKS endpoint. Actuator health/metrics paths are public. Disabled entirely in the `local` profile.
 
-## Security Implementation
+### 2. TokenGuardFilter
+Enforces two independent Redis-backed sliding-window limits per user identity (resolved from JWT principal or `X-User-Id` header):
+- **Requests per minute** — returns `429` with `Retry-After: 60`
+- **Estimated tokens per hour** — returns `429` with `Retry-After: 3600`
 
-The gateway enforces security at multiple levels:
-- Authentication via OAuth2/OIDC
-- Authorization checks
-- Input validation and sanitization
-- Output redaction of sensitive data
-- Rate limiting to prevent abuse
-- Circuit breaking for resilience
+Fails open (passes traffic) if Redis is unavailable.
 
-## Deployment
+### 3. JailbreakClassifierFilter
+Buffers the request body and scans it against 14 regex patterns covering:
+- Instruction-override phrases ("ignore all previous instructions", "forget your instructions")
+- DAN / unrestricted-AI role-play
+- Safety/restriction bypass attempts
+- Raw model tokens injected into user input (`[INST]`, `<|im_start|>`, etc.)
 
-The gateway can be deployed as a microservice and integrated with any CIAM solution for authentication and authorization.
+Returns `403 Forbidden` on a match. Fails open on read errors.
 
-## Build and Run
+### 4. PiiRedactorFilter
+Intercepts the response body (text/JSON content types only) and redacts:
 
-### Prerequisites
-- Java 17
-- Maven
-- Redis server (for rate limiting)
+| Pattern | Placeholder |
+|---|---|
+| Email addresses | `[REDACTED-EMAIL]` |
+| US Social Security Numbers | `[REDACTED-SSN]` |
+| Credit / debit card numbers | `[REDACTED-CARD]` |
+| US phone numbers | `[REDACTED-PHONE]` |
+| IPv4 addresses | `[REDACTED-IP]` |
+| US ZIP codes | `[REDACTED-ZIP]` |
 
-### Build
-```bash
-./build.sh
-```
+## Endpoints
 
-### Run
-```bash
-mvn spring-boot:run
-```
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/api/chat` | Direct chat via Ollama — `{"prompt": "..."}` |
+| `ANY` | `/api/llm/**` | Proxied to `lb://llm-service` (full filter chain) |
+| `ANY` | `/api/secure-llm/**` | Proxied to `lb://secure-llm` (full filter chain) |
+| `GET` | `/api/v1/check-connectivity` | Outbound connectivity health check |
+| `GET` | `/actuator/health` | Application health |
+| `GET` | `/actuator/prometheus` | Prometheus metrics |
 
 ## Configuration
 
-The gateway can be configured via `application.yml` and `application-local.yml` files. Key configuration options include:
-- Redis connection settings
-- OAuth2 issuer URIs
-- Rate limiting thresholds
-- Circuit breaker settings
-- Security policies
+### Environment variables
 
-## Usage
+| Variable | Default | Description |
+|---|---|---|
+| `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama server URL |
+| `OLLAMA_MODEL` | `gemma3:1b` | Model name (must be pulled in Ollama) |
+| `OLLAMA_TIMEOUT_SECONDS` | `120` | Request timeout |
+| `REDIS_HOST` | `localhost` | Redis host |
+| `REDIS_PORT` | `6379` | Redis port |
+| `REDIS_PASSWORD` | _(empty)_ | Redis password |
+| `MAX_REQUESTS_PER_MINUTE` | `60` | Per-user request rate limit |
+| `MAX_TOKENS_PER_HOUR` | `100000` | Per-user token rate limit |
+| `JAILBREAK_DETECTION_ENABLED` | `true` | Toggle jailbreak filter |
+| `PII_REDACTION_ENABLED` | `true` | Toggle PII redaction filter |
+| `JWT_ISSUER_URI` | _(required in prod)_ | OIDC issuer URI |
+| `JWT_JWKS_URI` | _(required in prod)_ | JWKS endpoint URL |
 
-The gateway exposes REST endpoints that route requests to various LLM services while applying security filters to all requests.
+### Profiles
 
-## Monitoring
+| Profile | Auth | Use case |
+|---|---|---|
+| `local` (default) | Disabled — all requests permitted | Local development |
+| `prod` | JWT required (JWKS-validated) | Production deployment |
 
-The gateway exposes metrics via Spring Boot Actuator:
-- Health checks
-- Metrics endpoint
-- Prometheus endpoint
-- Info endpoint
+## Prerequisites
+
+- Java 17
+- Maven 3.x
+- [Ollama](https://ollama.com) running locally with at least one model pulled
+- Redis (required for rate limiting; gateway starts without it but rate limiting fails open)
+
+## Build and Run
+
+```bash
+# Pull a model into Ollama first
+ollama pull gemma3:1b
+
+# Build
+mvn clean package -q
+
+# Run (local profile — auth disabled)
+mvn spring-boot:run
+
+# Run with a different model
+OLLAMA_MODEL=mistral mvn spring-boot:run
+
+# Run in production mode
+SPRING_PROFILES_ACTIVE=prod \
+  JWT_ISSUER_URI=https://auth.example.com \
+  JWT_JWKS_URI=https://auth.example.com/.well-known/jwks.json \
+  mvn spring-boot:run
+```
+
+### Docker
+
+```bash
+docker build -t ai-gateway .
+docker run -p 8081:8080 \
+  -e OLLAMA_BASE_URL=http://host.docker.internal:11434 \
+  ai-gateway
+```
+
+## Example request
+
+```bash
+curl -X POST http://localhost:8081/api/chat \
+  -H "Content-Type: application/json" \
+  -d '{"prompt": "Explain zero-trust security in one paragraph."}'
+```
 
 ## License
 
