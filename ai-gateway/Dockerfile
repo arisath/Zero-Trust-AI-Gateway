@@ -1,22 +1,26 @@
 # ── Build stage ───────────────────────────────────────────────────────────────
+# Context: project root (set in docker-compose.yml)
 FROM eclipse-temurin:17-jdk-alpine AS build
 WORKDIR /workspace
 
-# Cache dependency resolution separately from source compilation
+# Copy parent POM + all child POMs so Maven can resolve the module hierarchy
 COPY pom.xml .
-RUN apk add --no-cache maven && mvn -q -B dependency:go-offline
+COPY ai-gateway/pom.xml ai-gateway/
+COPY auth-service/pom.xml auth-service/
 
-COPY src src
-RUN mvn -q -B package -DskipTests
+RUN apk add --no-cache maven && mvn -q -B -pl ai-gateway dependency:go-offline
+
+# Copy only this module's source — keeps the layer cache valid for the other module
+COPY ai-gateway/src ai-gateway/src
+RUN mvn -q -B -pl ai-gateway -DskipTests package
 
 # ── Runtime stage ─────────────────────────────────────────────────────────────
 FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
 
-# Run as non-root
 RUN addgroup -S gateway && adduser -S gateway -G gateway
 
-COPY --from=build /workspace/target/ai-gateway-*.jar app.jar
+COPY --from=build /workspace/ai-gateway/target/ai-gateway-*.jar app.jar
 RUN chown gateway:gateway app.jar
 USER gateway
 

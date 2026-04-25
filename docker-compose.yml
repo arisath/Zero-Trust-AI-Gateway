@@ -3,8 +3,8 @@ services:
   # ── Auth Service ─────────────────────────────────────────────────────────
   auth-service:
     build:
-      context: ./auth-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: auth-service/Dockerfile
     ports:
       - "9000:9000"
     environment:
@@ -24,8 +24,8 @@ services:
   # ── AI Gateway ────────────────────────────────────────────────────────────
   ai-gateway:
     build:
-      context: ./ai-gateway
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ai-gateway/Dockerfile
     ports:
       - "8081:8081"
     environment:
