@@ -6,6 +6,8 @@ A Spring Boot / Spring Cloud Gateway application that sits in front of LLM servi
 
 ## Architecture
 
+![Sequence diagram — POST /api/chat request flow](img/sequence-diagram.svg)
+
 ```
 Client
   │
