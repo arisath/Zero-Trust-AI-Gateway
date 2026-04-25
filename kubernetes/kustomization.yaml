@@ -11,6 +11,10 @@ resources:
   - ollama/pvc.yaml
   - ollama/deployment.yaml
   - ollama/service.yaml
+  # Auth Service
+  - auth-service/secret.yaml
+  - auth-service/deployment.yaml
+  - auth-service/service.yaml
   # AI Gateway
   - ai-gateway/configmap.yaml
   - ai-gateway/secret.yaml

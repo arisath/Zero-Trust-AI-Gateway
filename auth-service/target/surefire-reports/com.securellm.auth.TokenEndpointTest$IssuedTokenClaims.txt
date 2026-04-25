@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: com.securellm.auth.TokenEndpointTest$IssuedTokenClaims
+-------------------------------------------------------------------------------
+Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 19.56 s -- in com.securellm.auth.TokenEndpointTest$IssuedTokenClaims

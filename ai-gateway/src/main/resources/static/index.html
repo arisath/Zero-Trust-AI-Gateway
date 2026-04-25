@@ -17,6 +17,7 @@
       align-items: center;
     }
 
+    /* ── Header ─────────────────────────────────────────────────────── */
     header {
       width: 100%;
       padding: 14px 24px;
@@ -25,35 +26,61 @@
       display: flex;
       align-items: center;
       gap: 10px;
+      flex-shrink: 0;
     }
-
-    header .shield {
-      font-size: 20px;
-    }
-
-    header h1 {
-      font-size: 15px;
-      font-weight: 600;
-      color: #e1e4e8;
-    }
-
+    header .shield { font-size: 20px; }
+    header h1 { font-size: 15px; font-weight: 600; color: #e1e4e8; }
     header span.tag {
       margin-left: auto;
-      font-size: 11px;
-      color: #8b949e;
-      background: #21262d;
-      border: 1px solid #30363d;
-      border-radius: 12px;
-      padding: 2px 10px;
+      font-size: 11px; color: #8b949e;
+      background: #21262d; border: 1px solid #30363d;
+      border-radius: 12px; padding: 2px 10px;
     }
 
+    /* ── Landing (empty state) ──────────────────────────────────────── */
+    #landing {
+      flex: 1;
+      width: 100%;
+      max-width: 680px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      padding: 0 16px 32px;
+      text-align: center;
+    }
+    #landing .hero-icon { font-size: 48px; margin-bottom: 4px; }
+    #landing h2 { font-size: 26px; font-weight: 700; color: #e1e4e8; }
+    #landing p  { font-size: 14px; color: #8b949e; max-width: 420px; line-height: 1.6; }
+
+    .suggestion-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+      margin-top: 8px;
+    }
+    .chip {
+      background: #21262d;
+      border: 1px solid #30363d;
+      border-radius: 20px;
+      padding: 6px 14px;
+      font-size: 12px;
+      color: #8b949e;
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s;
+    }
+    .chip:hover { border-color: #1f6feb; color: #e1e4e8; }
+
+    /* ── Chat window (active state) ─────────────────────────────────── */
     #chat-window {
+      display: none;
       flex: 1;
       width: 100%;
       max-width: 780px;
       overflow-y: auto;
-      padding: 24px 16px;
-      display: flex;
+      padding: 24px 16px 8px;
       flex-direction: column;
       gap: 16px;
     }
@@ -64,10 +91,9 @@
       max-width: 72%;
       gap: 4px;
     }
-
-    .message.user { align-self: flex-end; align-items: flex-end; }
+    .message.user      { align-self: flex-end;   align-items: flex-end;   }
     .message.assistant { align-self: flex-start; align-items: flex-start; }
-    .message.error { align-self: center; align-items: center; max-width: 90%; }
+    .message.error     { align-self: center;     align-items: center; max-width: 90%; }
 
     .bubble {
       padding: 10px 14px;
@@ -77,63 +103,63 @@
       white-space: pre-wrap;
       word-break: break-word;
     }
-
     .message.user .bubble {
-      background: #1f6feb;
-      color: #fff;
+      background: #1f6feb; color: #fff;
       border-bottom-right-radius: 4px;
     }
-
     .message.assistant .bubble {
-      background: #21262d;
-      border: 1px solid #30363d;
-      color: #e1e4e8;
-      border-bottom-left-radius: 4px;
+      background: #21262d; border: 1px solid #30363d;
+      color: #e1e4e8; border-bottom-left-radius: 4px;
     }
-
     .message.error .bubble {
-      background: #2d1118;
-      border: 1px solid #f85149;
-      color: #f85149;
-      border-radius: 8px;
-      font-size: 13px;
+      background: #2d1118; border: 1px solid #f85149;
+      color: #f85149; border-radius: 8px; font-size: 13px;
     }
 
-    .label {
-      font-size: 11px;
-      color: #8b949e;
-      padding: 0 4px;
+    .label { font-size: 11px; color: #8b949e; padding: 0 4px; }
+
+    /* category badge under assistant reply */
+    .category-badge {
+      font-size: 10px;
+      color: #6e7681;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 10px;
+      padding: 2px 8px;
+      margin-top: 2px;
+      margin-left: 4px;
+      letter-spacing: 0.4px;
     }
 
+    /* typing dots */
     .typing .bubble {
-      display: flex;
-      gap: 5px;
-      align-items: center;
-      padding: 12px 16px;
+      display: flex; gap: 5px; align-items: center; padding: 12px 16px;
     }
-
     .dot {
       width: 7px; height: 7px;
-      background: #8b949e;
-      border-radius: 50%;
+      background: #8b949e; border-radius: 50%;
       animation: bounce 1.2s infinite;
     }
     .dot:nth-child(2) { animation-delay: 0.2s; }
     .dot:nth-child(3) { animation-delay: 0.4s; }
-
     @keyframes bounce {
       0%, 80%, 100% { transform: translateY(0); }
-      40% { transform: translateY(-6px); }
+      40%           { transform: translateY(-6px); }
     }
 
+    /* ── Input area ─────────────────────────────────────────────────── */
     #input-area {
       width: 100%;
-      max-width: 780px;
-      padding: 12px 16px 20px;
+      max-width: 680px;
+      padding: 12px 16px 24px;
       display: flex;
       gap: 10px;
       align-items: flex-end;
+      flex-shrink: 0;
     }
+
+    /* wider input once chat is active */
+    body.has-messages #input-area { max-width: 780px; }
 
     #prompt-input {
       flex: 1;
@@ -143,35 +169,27 @@
       color: #e1e4e8;
       font-size: 14px;
       padding: 10px 14px;
-      resize: none;
-      outline: none;
+      resize: none; outline: none;
       line-height: 1.5;
       max-height: 180px;
       overflow-y: auto;
       transition: border-color 0.15s;
     }
-
-    #prompt-input:focus { border-color: #1f6feb; }
+    #prompt-input:focus       { border-color: #1f6feb; }
     #prompt-input::placeholder { color: #484f58; }
 
     #send-btn {
-      background: #1f6feb;
-      border: none;
-      border-radius: 10px;
-      color: #fff;
-      cursor: pointer;
-      padding: 10px 18px;
-      font-size: 14px;
-      font-weight: 500;
+      background: #1f6feb; border: none; border-radius: 10px;
+      color: #fff; cursor: pointer;
+      padding: 10px 18px; font-size: 14px; font-weight: 500;
       transition: background 0.15s, opacity 0.15s;
-      white-space: nowrap;
-      height: 40px;
+      white-space: nowrap; height: 40px;
     }
-
     #send-btn:hover:not(:disabled) { background: #388bfd; }
     #send-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
-    #chat-window::-webkit-scrollbar { width: 6px; }
+    /* scrollbar */
+    #chat-window::-webkit-scrollbar       { width: 6px; }
     #chat-window::-webkit-scrollbar-track { background: transparent; }
     #chat-window::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
   </style>
@@ -184,13 +202,28 @@
   <span class="tag">local</span>
 </header>
 
+<!-- Empty / landing state -->
+<div id="landing">
+  <div class="hero-icon">🛡</div>
+  <h2>How can I help you?</h2>
+  <p>Ask anything. Your query is classified automatically and routed to the right specialist model.</p>
+  <div class="suggestion-chips">
+    <span class="chip" data-prompt="Write a binary search algorithm in Python">💻 Write code</span>
+    <span class="chip" data-prompt="Solve x² - 5x + 6 = 0">📐 Solve maths</span>
+    <span class="chip" data-prompt="Why did the Roman Empire fall?">📜 Ask history</span>
+    <span class="chip" data-prompt="Explain how photosynthesis works">🔬 Explain science</span>
+    <span class="chip" data-prompt="Write a short poem about the sea">✍️ Creative writing</span>
+  </div>
+</div>
+
+<!-- Active chat state -->
 <div id="chat-window"></div>
 
 <div id="input-area">
   <textarea
     id="prompt-input"
     rows="1"
-    placeholder="Type a message…"
+    placeholder="Ask anything…"
     autocomplete="off"
   ></textarea>
   <button id="send-btn">Send</button>
@@ -198,8 +231,29 @@
 
 <script>
   const chatWindow = document.getElementById('chat-window');
-  const input = document.getElementById('prompt-input');
-  const sendBtn = document.getElementById('send-btn');
+  const landing    = document.getElementById('landing');
+  const input      = document.getElementById('prompt-input');
+  const sendBtn    = document.getElementById('send-btn');
+
+  const CATEGORY_LABELS = {
+    PROGRAMMING:     '💻 Programming',
+    MATHEMATICS:     '📐 Mathematics',
+    HISTORY:         '📜 History',
+    SCIENCE:         '🔬 Science',
+    CREATIVE_WRITING:'✍️ Creative',
+    LEGAL:           '⚖️ Legal',
+    MEDICAL:         '🩺 Medical',
+    GENERAL:         '💬 General',
+  };
+
+  // Suggestion chips
+  document.querySelectorAll('.chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      input.value = chip.dataset.prompt;
+      input.dispatchEvent(new Event('input'));
+      input.focus();
+    });
+  });
 
   // Auto-resize textarea
   input.addEventListener('input', () => {
@@ -209,15 +263,19 @@
 
   // Send on Enter (Shift+Enter = new line)
   input.addEventListener('keydown', e => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      send();
-    }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
   });
 
   sendBtn.addEventListener('click', send);
 
-  function appendMessage(role, text) {
+  function activateChat() {
+    if (document.body.classList.contains('has-messages')) return;
+    document.body.classList.add('has-messages');
+    landing.style.display = 'none';
+    chatWindow.style.display = 'flex';
+  }
+
+  function appendMessage(role, text, category) {
     const wrap = document.createElement('div');
     wrap.className = `message ${role}`;
 
@@ -231,6 +289,14 @@
 
     if (label.textContent) wrap.appendChild(label);
     wrap.appendChild(bubble);
+
+    if (role === 'assistant' && category) {
+      const badge = document.createElement('span');
+      badge.className = 'category-badge';
+      badge.textContent = CATEGORY_LABELS[category] ?? category;
+      wrap.appendChild(badge);
+    }
+
     chatWindow.appendChild(wrap);
     chatWindow.scrollTop = chatWindow.scrollHeight;
     return wrap;
@@ -263,6 +329,7 @@
     input.style.height = 'auto';
     sendBtn.disabled = true;
 
+    activateChat();
     appendMessage('user', prompt);
     const typingEl = appendTyping();
 
@@ -277,7 +344,7 @@
 
       if (res.ok) {
         const data = await res.json();
-        appendMessage('assistant', data.response);
+        appendMessage('assistant', data.response, data.category);
       } else {
         let errorText = 'Request blocked by security policy.';
         try {

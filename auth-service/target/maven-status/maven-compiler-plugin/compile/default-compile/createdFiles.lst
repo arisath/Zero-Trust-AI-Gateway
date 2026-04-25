@@ -1,0 +1,3 @@
+com/securellm/auth/config/SecurityConfig.class
+com/securellm/auth/config/AuthorizationServerConfig.class
+com/securellm/auth/AuthServiceApplication.class

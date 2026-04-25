@@ -1,0 +1,29 @@
+server:
+  port: 9000
+
+spring:
+  application:
+    name: auth-service
+
+auth:
+  issuer-uri: ${AUTH_ISSUER_URI:http://localhost:9000}
+
+  # Default in-memory clients — override with AUTH_CLIENT_ID / AUTH_CLIENT_SECRET in prod
+  clients:
+    - id: ${AUTH_CLIENT_ID:ai-gateway-client}
+      secret: ${AUTH_CLIENT_SECRET:secret}
+
+  # Default in-memory user — for authorization-code flow (browser login)
+  users:
+    - username: ${AUTH_USER:user}
+      password: ${AUTH_PASSWORD:password}
+      roles: USER
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always

@@ -1,5 +1,26 @@
 services:
 
+  # ── Auth Service ─────────────────────────────────────────────────────────
+  auth-service:
+    build:
+      context: ./auth-service
+      dockerfile: Dockerfile
+    ports:
+      - "9000:9000"
+    environment:
+      AUTH_ISSUER_URI: http://auth-service:9000
+      AUTH_CLIENT_ID: ${AUTH_CLIENT_ID:-ai-gateway-client}
+      AUTH_CLIENT_SECRET: ${AUTH_CLIENT_SECRET:-secret}
+      AUTH_USER: ${AUTH_USER:-user}
+      AUTH_PASSWORD: ${AUTH_PASSWORD:-password}
+    restart: on-failure
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:9000/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
   # ── AI Gateway ────────────────────────────────────────────────────────────
   ai-gateway:
     build:
@@ -8,7 +29,10 @@ services:
     ports:
       - "8081:8081"
     environment:
-      SPRING_PROFILES_ACTIVE: local
+      # Use 'prod' to enforce JWT validation; 'local' disables auth entirely
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-local}
+      JWT_ISSUER_URI: http://auth-service:9000
+      JWT_JWKS_URI: http://auth-service:9000/oauth2/jwks
 
       # Ollama
       OLLAMA_BASE_URL: http://ollama:11434
@@ -35,6 +59,8 @@ services:
         condition: service_healthy
       ollama:
         condition: service_started
+      auth-service:
+        condition: service_healthy
     restart: on-failure
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8081/actuator/health | grep -q '\"status\":\"UP\"'"]
