@@ -26,7 +26,7 @@ gateway:
     enabled: ${PII_REDACTION_ENABLED:true}
   blocklist:
     enabled: ${BLOCKLIST_ENABLED:true}
-    words: ${BLOCKLIST_WORDS:}
+    file: ${BLOCKLIST_FILE:}
 
 llm:
   ollama:

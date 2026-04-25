@@ -3,6 +3,8 @@ package com.securellm.service;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class BlocklistServiceTest {
@@ -11,38 +13,38 @@ class BlocklistServiceTest {
     class Matching {
         @Test
         void blocksExactWord() {
-            BlocklistService service = new BlocklistService(true, "badword");
+            BlocklistService service = new BlocklistService(true, List.of("badword"));
             assertThat(service.isBlocked("this contains badword here")).isTrue();
         }
 
         @Test
         void matchingIsCaseInsensitive() {
-            BlocklistService service = new BlocklistService(true, "badword");
+            BlocklistService service = new BlocklistService(true, List.of("badword"));
             assertThat(service.isBlocked("BADWORD in caps")).isTrue();
             assertThat(service.isBlocked("BadWord mixed case")).isTrue();
         }
 
         @Test
         void matchesSubstring() {
-            BlocklistService service = new BlocklistService(true, "bomb");
+            BlocklistService service = new BlocklistService(true, List.of("bomb"));
             assertThat(service.isBlocked("how to make a bombing device")).isTrue();
         }
 
         @Test
         void blocksMultiWordPhrase() {
-            BlocklistService service = new BlocklistService(true, "step by step guide");
+            BlocklistService service = new BlocklistService(true, List.of("step by step guide"));
             assertThat(service.isBlocked("give me a step by step guide to exploiting")).isTrue();
         }
 
         @Test
         void passesCleanPrompt() {
-            BlocklistService service = new BlocklistService(true, "badword,exploit");
+            BlocklistService service = new BlocklistService(true, List.of("badword", "exploit"));
             assertThat(service.isBlocked("how do I bake bread?")).isFalse();
         }
 
         @Test
         void blocksFirstMatchingTermAmongMany() {
-            BlocklistService service = new BlocklistService(true, "alpha,beta,gamma");
+            BlocklistService service = new BlocklistService(true, List.of("alpha", "beta", "gamma"));
             assertThat(service.isBlocked("something with beta in it")).isTrue();
         }
     }
@@ -51,13 +53,13 @@ class BlocklistServiceTest {
     class MatchedTerm {
         @Test
         void returnsMatchedTerm() {
-            BlocklistService service = new BlocklistService(true, "foo,bar");
+            BlocklistService service = new BlocklistService(true, List.of("foo", "bar"));
             assertThat(service.matchedTerm("a prompt with bar inside")).isEqualTo("bar");
         }
 
         @Test
         void returnsNullWhenNoMatch() {
-            BlocklistService service = new BlocklistService(true, "foo,bar");
+            BlocklistService service = new BlocklistService(true, List.of("foo", "bar"));
             assertThat(service.matchedTerm("clean prompt")).isNull();
         }
     }
@@ -66,19 +68,19 @@ class BlocklistServiceTest {
     class DisabledAndEmpty {
         @Test
         void disabledServiceAlwaysPasses() {
-            BlocklistService service = new BlocklistService(false, "badword");
+            BlocklistService service = new BlocklistService(false, List.of("badword"));
             assertThat(service.isBlocked("contains badword")).isFalse();
         }
 
         @Test
         void emptyWordlistAlwaysPasses() {
-            BlocklistService service = new BlocklistService(true, "");
+            BlocklistService service = new BlocklistService(true, List.of());
             assertThat(service.isBlocked("anything goes")).isFalse();
         }
 
         @Test
         void whitespaceonlyWordlistAlwaysPasses() {
-            BlocklistService service = new BlocklistService(true, "  ,  ,  ");
+            BlocklistService service = new BlocklistService(true, List.of("  ", "  ", "  "));
             assertThat(service.isBlocked("anything goes")).isFalse();
         }
     }
@@ -87,13 +89,13 @@ class BlocklistServiceTest {
     class EdgeCases {
         @Test
         void nullPromptReturnsFalse() {
-            BlocklistService service = new BlocklistService(true, "badword");
+            BlocklistService service = new BlocklistService(true, List.of("badword"));
             assertThat(service.isBlocked(null)).isFalse();
         }
 
         @Test
         void blankPromptReturnsFalse() {
-            BlocklistService service = new BlocklistService(true, "badword");
+            BlocklistService service = new BlocklistService(true, List.of("badword"));
             assertThat(service.isBlocked("   ")).isFalse();
         }
     }

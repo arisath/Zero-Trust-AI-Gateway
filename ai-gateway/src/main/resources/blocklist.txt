@@ -1,0 +1,47 @@
+# Blocklist — one term per line
+# Blank lines and lines starting with '#' are ignored.
+# Terms are matched case-insensitively as substrings.
+
+# Firearms - handguns
+glock
+beretta
+sig sauer
+smith & wesson
+colt 1911
+desert eagle
+revolver
+pistol
+handgun
+
+# Firearms - rifles
+ak-47
+ak47
+ar-15
+ar15
+m16
+m4 carbine
+sniper rifle
+assault rifle
+semi-automatic rifle
+
+# Firearms - shotguns
+shotgun
+pump-action shotgun
+sawed-off shotgun
+mossberg
+remington 870
+
+# Firearms - submachine guns
+uzi
+mp5
+mac-10
+tommy gun
+submachine gun
+
+# Firearms - general
+machine gun
+automatic weapon
+firearm
+ammunition
+hollow point
+armor piercing round

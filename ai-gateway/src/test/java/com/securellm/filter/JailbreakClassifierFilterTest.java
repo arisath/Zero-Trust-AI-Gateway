@@ -13,6 +13,7 @@ import org.springframework.mock.web.server.MockServerWebExchange;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -26,7 +27,7 @@ class JailbreakClassifierFilterTest {
     @BeforeEach
     void setUp() {
         jailbreakService = new JailbreakDetectionService();
-        blocklistService = new BlocklistService(true, "forbidden,exploit");
+        blocklistService = new BlocklistService(true, List.of("forbidden", "exploit"));
         filter = new JailbreakClassifierFilter(jailbreakService, blocklistService);
     }
 
