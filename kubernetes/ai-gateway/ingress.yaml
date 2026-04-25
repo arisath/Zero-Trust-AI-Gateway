@@ -1,0 +1,28 @@
+# Requires an Ingress controller in your cluster (e.g. ingress-nginx, Traefik).
+# Replace the host value with your actual domain.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ai-gateway
+  namespace: ai-gateway
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "120"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: ai-gateway.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ai-gateway
+                port:
+                  number: 80
+  # Uncomment to enable TLS (cert-manager or manual secret)
+  # tls:
+  #   - hosts:
+  #       - ai-gateway.example.com
+  #     secretName: ai-gateway-tls

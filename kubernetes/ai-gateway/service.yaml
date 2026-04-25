@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ai-gateway
+  namespace: ai-gateway
+spec:
+  selector:
+    app: ai-gateway
+  ports:
+    - port: 80
+      targetPort: 8081
+  # Use ClusterIP if you're fronting with an Ingress (recommended).
+  # Change to LoadBalancer to get a cloud load balancer directly.
+  type: ClusterIP

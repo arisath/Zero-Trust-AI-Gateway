@@ -264,6 +264,64 @@ SPRING_PROFILES_ACTIVE=prod \
   mvn spring-boot:run
 ```
 
+### Kubernetes
+
+Manifests live in `kubernetes/`. The folder structure is:
+
+```
+kubernetes/
+├── kustomization.yaml
+├── namespace.yaml
+├── redis/          pvc · deployment · service
+├── ollama/         pvc · deployment · service
+└── ai-gateway/     configmap · secret · deployment · service · ingress · hpa
+```
+
+**Before applying**, push your image to a registry and update the `image:` field in `kubernetes/ai-gateway/deployment.yaml`:
+
+```bash
+# Build and push
+docker build -t ghcr.io/your-org/ai-gateway:latest ./ai-gateway
+docker push ghcr.io/your-org/ai-gateway:latest
+
+# Update the image field
+sed -i 's|image: ai-gateway:latest|image: ghcr.io/your-org/ai-gateway:latest|' \
+  kubernetes/ai-gateway/deployment.yaml
+```
+
+**Deploy everything** with Kustomize (built into `kubectl` since v1.14):
+
+```bash
+kubectl apply -k kubernetes/
+```
+
+**Pull models** into the running Ollama pod:
+
+```bash
+kubectl -n ai-gateway exec deploy/ollama -- ollama pull gemma3:1b
+kubectl -n ai-gateway exec deploy/ollama -- ollama pull codellama:7b
+kubectl -n ai-gateway exec deploy/ollama -- ollama pull llama3.2:3b
+```
+
+**Check status:**
+
+```bash
+kubectl -n ai-gateway get pods
+kubectl -n ai-gateway logs deploy/ai-gateway
+```
+
+**Tear down:**
+
+```bash
+kubectl delete -k kubernetes/
+```
+
+Key notes:
+- The Ingress in `ai-gateway/ingress.yaml` requires an Ingress controller (e.g. ingress-nginx). Update the `host:` field to your domain.
+- Secrets in `ai-gateway/secret.yaml` are empty placeholders — do not commit real credentials. Use Sealed Secrets, Vault, or your cloud provider's secrets manager.
+- GPU support for Ollama is commented out in `ollama/deployment.yaml` — uncomment the `resources.limits` and `nodeSelector` blocks if your cluster has GPU nodes with the NVIDIA device plugin installed.
+- The HPA scales the gateway between 2–10 replicas based on CPU (70%) and memory (80%) utilisation.
+
 ## Example request
 
 ```bash

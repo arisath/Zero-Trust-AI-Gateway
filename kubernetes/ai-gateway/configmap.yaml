@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ai-gateway-config
+  namespace: ai-gateway
+data:
+  SPRING_PROFILES_ACTIVE: "local"
+  OLLAMA_BASE_URL: "http://ollama:11434"
+  OLLAMA_CLASSIFIER_MODEL: "gemma3:1b"
+  OLLAMA_MODEL_PROGRAMMING: "codellama:7b"
+  OLLAMA_MODEL_MATHEMATICS: "qwen2.5-math:7b"
+  OLLAMA_MODEL_HISTORY: "llama3.2:3b"
+  OLLAMA_MODEL_SCIENCE: "llama3.2:3b"
+  OLLAMA_MODEL_CREATIVE_WRITING: "mistral:7b"
+  OLLAMA_MODEL_LEGAL: "llama3.2:3b"
+  OLLAMA_MODEL_MEDICAL: "llama3.2:3b"
+  OLLAMA_MODEL_GENERAL: "gemma3:1b"
+  OLLAMA_TIMEOUT_SECONDS: "120"
+  REDIS_HOST: "redis"
+  REDIS_PORT: "6379"
+  MAX_REQUESTS_PER_MINUTE: "60"
+  MAX_TOKENS_PER_HOUR: "100000"
