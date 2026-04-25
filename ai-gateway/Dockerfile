@@ -1,9 +1,28 @@
-FROM openjdk:17-jdk-slim
+# ── Build stage ───────────────────────────────────────────────────────────────
+FROM eclipse-temurin:17-jdk-alpine AS build
+WORKDIR /workspace
 
+# Cache dependency resolution separately from source compilation
+COPY pom.xml .
+RUN apk add --no-cache maven && mvn -q -B dependency:go-offline
+
+COPY src src
+RUN mvn -q -B package -DskipTests
+
+# ── Runtime stage ─────────────────────────────────────────────────────────────
+FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
 
-COPY target/secure-llm-gateway-0.0.1-SNAPSHOT.jar app.jar
+# Run as non-root
+RUN addgroup -S gateway && adduser -S gateway -G gateway
 
-EXPOSE 8080
+COPY --from=build /workspace/target/ai-gateway-*.jar app.jar
+RUN chown gateway:gateway app.jar
+USER gateway
 
-ENTRYPOINT ["java", "-jar", "app.jar"]
+EXPOSE 8081
+
+ENTRYPOINT ["java", \
+  "-XX:+UseContainerSupport", \
+  "-XX:MaxRAMPercentage=75.0", \
+  "-jar", "app.jar"]

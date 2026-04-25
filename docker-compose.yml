@@ -1,0 +1,80 @@
+services:
+
+  # ── AI Gateway ────────────────────────────────────────────────────────────
+  ai-gateway:
+    build:
+      context: ./ai-gateway
+      dockerfile: Dockerfile
+    ports:
+      - "8081:8081"
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+
+      # Ollama
+      OLLAMA_BASE_URL: http://ollama:11434
+      OLLAMA_CLASSIFIER_MODEL: ${OLLAMA_CLASSIFIER_MODEL:-gemma3:1b}
+      OLLAMA_MODEL_PROGRAMMING: ${OLLAMA_MODEL_PROGRAMMING:-codellama:7b}
+      OLLAMA_MODEL_MATHEMATICS: ${OLLAMA_MODEL_MATHEMATICS:-qwen2.5-math:7b}
+      OLLAMA_MODEL_HISTORY: ${OLLAMA_MODEL_HISTORY:-llama3.2:3b}
+      OLLAMA_MODEL_SCIENCE: ${OLLAMA_MODEL_SCIENCE:-llama3.2:3b}
+      OLLAMA_MODEL_CREATIVE_WRITING: ${OLLAMA_MODEL_CREATIVE_WRITING:-mistral:7b}
+      OLLAMA_MODEL_LEGAL: ${OLLAMA_MODEL_LEGAL:-llama3.2:3b}
+      OLLAMA_MODEL_MEDICAL: ${OLLAMA_MODEL_MEDICAL:-llama3.2:3b}
+      OLLAMA_MODEL_GENERAL: ${OLLAMA_MODEL_GENERAL:-gemma3:1b}
+      OLLAMA_TIMEOUT_SECONDS: ${OLLAMA_TIMEOUT_SECONDS:-120}
+
+      # Redis
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+
+      # Rate limits
+      MAX_REQUESTS_PER_MINUTE: ${MAX_REQUESTS_PER_MINUTE:-60}
+      MAX_TOKENS_PER_HOUR: ${MAX_TOKENS_PER_HOUR:-100000}
+    depends_on:
+      redis:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+    restart: on-failure
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8081/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ── Redis (rate limiting) ─────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --save 60 1 --loglevel warning
+    restart: on-failure
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ── Ollama (LLM server) ───────────────────────────────────────────────────
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    restart: on-failure
+    # GPU support (uncomment if you have an NVIDIA GPU + nvidia-container-toolkit)
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
+volumes:
+  redis-data:
+  ollama-data:

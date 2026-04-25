@@ -215,40 +215,53 @@ Every model can be overridden with an environment variable — see the Configura
 
 ## Prerequisites
 
-- Java 17
-- Maven 3.x
+**Docker (recommended)**
+- Docker 24+ and Docker Compose v2
+
+**Local (without Docker)**
+- Java 17, Maven 3.x
 - [Ollama](https://ollama.com) running locally with at least one model pulled
 - Redis (required for rate limiting; gateway starts without it but rate limiting fails open)
 
 ## Build and Run
 
+### Docker Compose (recommended)
+
+The compose file starts the gateway, Redis, and an Ollama container together.
+
+```bash
+# 1. Start everything
+docker compose up --build
+
+# 2. Pull the models you want into the running Ollama container
+docker compose exec ollama ollama pull gemma3:1b       # classifier + general
+docker compose exec ollama ollama pull codellama:7b    # programming
+docker compose exec ollama ollama pull llama3.2:3b     # history / science / legal / medical
+
+# 3. The gateway is now available at http://localhost:8081
+```
+
+Override any model via env var without rebuilding:
+
+```bash
+OLLAMA_MODEL_PROGRAMMING=deepseek-coder:6.7b docker compose up
+```
+
+### Local (Maven)
+
 ```bash
 # Pull a model into Ollama first
 ollama pull gemma3:1b
 
-# Build
-mvn clean package -q
-
-# Run (local profile — auth disabled)
+# Build and run (local profile — auth disabled)
+cd ai-gateway
 mvn spring-boot:run
-
-# Run with a different model
-OLLAMA_MODEL=mistral mvn spring-boot:run
 
 # Run in production mode
 SPRING_PROFILES_ACTIVE=prod \
   JWT_ISSUER_URI=https://auth.example.com \
   JWT_JWKS_URI=https://auth.example.com/.well-known/jwks.json \
   mvn spring-boot:run
-```
-
-### Docker
-
-```bash
-docker build -t ai-gateway .
-docker run -p 8081:8080 \
-  -e OLLAMA_BASE_URL=http://host.docker.internal:11434 \
-  ai-gateway
 ```
 
 ## Example request
