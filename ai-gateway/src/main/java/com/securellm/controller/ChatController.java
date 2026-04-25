@@ -3,7 +3,9 @@ package com.securellm.controller;
 import com.securellm.service.BlocklistService;
 import com.securellm.service.JailbreakDetectionService;
 import com.securellm.service.LlmService;
+import com.securellm.service.ModelRoutingService;
 import com.securellm.service.PiiDetectionService;
+import com.securellm.service.QueryClassifierService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -36,16 +38,22 @@ public class ChatController {
     private final BlocklistService blocklistService;
     private final JailbreakDetectionService jailbreakDetectionService;
     private final PiiDetectionService piiDetectionService;
+    private final QueryClassifierService queryClassifierService;
+    private final ModelRoutingService modelRoutingService;
 
     public ChatController(
             LlmService llmService,
             BlocklistService blocklistService,
             JailbreakDetectionService jailbreakDetectionService,
-            PiiDetectionService piiDetectionService) {
+            PiiDetectionService piiDetectionService,
+            QueryClassifierService queryClassifierService,
+            ModelRoutingService modelRoutingService) {
         this.llmService = llmService;
         this.blocklistService = blocklistService;
         this.jailbreakDetectionService = jailbreakDetectionService;
         this.piiDetectionService = piiDetectionService;
+        this.queryClassifierService = queryClassifierService;
+        this.modelRoutingService = modelRoutingService;
     }
 
     @PostMapping(
@@ -72,10 +80,13 @@ public class ChatController {
         // Redact any PII in the prompt before sending it to the LLM
         String safePrompt = piiDetectionService.redactPii(request.prompt());
 
-        return llmService.processPrompt(safePrompt)
-            // Redact any PII that may appear in the LLM response
-            .map(piiDetectionService::redactPii)
-            .map(ChatResponse::new)
+        return queryClassifierService.classify(safePrompt)
+            .flatMap(category -> {
+                String targetModel = modelRoutingService.modelFor(category);
+                return llmService.processPrompt(safePrompt, targetModel)
+                    .map(piiDetectionService::redactPii)
+                    .map(response -> new ChatResponse(response, category.name()));
+            })
             .onErrorMap(ex -> !(ex instanceof ResponseStatusException), ex -> {
                 log.error("LLM call failed", ex);
                 return new ResponseStatusException(
@@ -84,5 +95,5 @@ public class ChatController {
     }
 
     public record ChatRequest(String prompt) {}
-    public record ChatResponse(String response) {}
+    public record ChatResponse(String response, String category) {}
 }

@@ -4,7 +4,7 @@
 
 # Firearms - handguns
 glock
-    beretta
+beretta
 sig sauer
 smith & wesson
 colt 1911

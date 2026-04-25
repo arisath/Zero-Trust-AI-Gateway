@@ -32,7 +32,17 @@ llm:
   ollama:
     base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
     model: ${OLLAMA_MODEL:gemma3:1b}
+    classifier-model: ${OLLAMA_CLASSIFIER_MODEL:gemma3:1b}
     timeout-seconds: ${OLLAMA_TIMEOUT_SECONDS:120}
+    models:
+      programming: ${OLLAMA_MODEL_PROGRAMMING:codellama:7b}
+      mathematics: ${OLLAMA_MODEL_MATHEMATICS:qwen2.5-math:7b}
+      history: ${OLLAMA_MODEL_HISTORY:llama3.2:3b}
+      science: ${OLLAMA_MODEL_SCIENCE:llama3.2:3b}
+      creative-writing: ${OLLAMA_MODEL_CREATIVE_WRITING:mistral:7b}
+      legal: ${OLLAMA_MODEL_LEGAL:llama3.2:3b}
+      medical: ${OLLAMA_MODEL_MEDICAL:llama3.2:3b}
+      general: ${OLLAMA_MODEL_GENERAL:gemma3:1b}
 
 management:
   endpoints:

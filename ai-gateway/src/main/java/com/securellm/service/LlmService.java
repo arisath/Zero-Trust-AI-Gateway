@@ -50,13 +50,13 @@ public class LlmService {
             .build();
     }
 
-    /**
-     * Sends {@code prompt} as a user message to Ollama and returns the assistant's reply.
-     * {@code stream} is set to {@code false} so we get a single JSON response.
-     */
     public Mono<String> processPrompt(String prompt) {
+        return processPrompt(prompt, model);
+    }
+
+    public Mono<String> processPrompt(String prompt, String modelOverride) {
         Map<String, Object> requestBody = Map.of(
-            "model", model,
+            "model", modelOverride,
             "messages", List.of(Map.of("role", "user", "content", prompt)),
             "stream", false
         );
