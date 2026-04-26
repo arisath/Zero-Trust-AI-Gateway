@@ -59,7 +59,7 @@ services:
     restart: on-failure
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:9000/actuator/health | grep -q '\"status\":\"UP\"'"]
-      interval: 600s
+      interval: 30s
       timeout: 5s
       retries: 5
       start_period: 20s
@@ -109,7 +109,7 @@ services:
     restart: on-failure
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8081/actuator/health | grep -q '\"status\":\"UP\"'"]
-      interval: 15s
+      interval: 30s
       timeout: 5s
       retries: 5
       start_period: 30s
@@ -148,8 +148,8 @@ services:
       - ollama-data:/root/.ollama
     restart: on-failure
     healthcheck:
-      test: ["CMD-SHELL", "ollama list > /dev/null 2>&1"]
-      interval: 10s
+      test: ["CMD-SHELL", "bash -c 'cat < /dev/null > /dev/tcp/localhost/11434'"]
+      interval: 30s
       timeout: 5s
       retries: 5
       start_period: 10s

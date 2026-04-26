@@ -56,3 +56,9 @@ management:
   endpoint:
     health:
       show-details: always
+
+logging:
+  level:
+    reactor.netty.http.server: WARN
+    org.springframework.web.reactive: WARN
+    org.springframework.boot.actuate.endpoint.web: WARN
