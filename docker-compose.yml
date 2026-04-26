@@ -2,24 +2,24 @@ services:
 
   # ── OpenLDAP (user directory) ─────────────────────────────────────────────
   openldap:
-    image: bitnami/openldap:latest
+    image: osixia/openldap:latest
     ports:
-      - "1389:1389"
+      - "389:389"
     environment:
-      LDAP_ROOT: dc=securellm,dc=com
-      LDAP_ADMIN_USERNAME: admin
+      LDAP_ORGANISATION: SecureLLM
+      LDAP_DOMAIN: securellm.com
       LDAP_ADMIN_PASSWORD: ${LDAP_ADMIN_PASSWORD:-adminpassword}
-      # Seed two users: alice (free tier) and bob (premium tier)
-      LDAP_USERS: alice,bob
-      LDAP_PASSWORDS: ${LDAP_USER_PASSWORDS:-alice123,bob123}
-      # bootstrap.ldif adds ou=groups and assigns each user to free/premium group
-      LDAP_CUSTOM_LDIF_DIR: /ldifs
+      LDAP_TLS: "false"
+      LDAP_LOG_LEVEL: "0"
+    # --copy-service ensures the bootstrap LDIF is reloaded when the container restarts
+    command: --copy-service
     volumes:
-      - ./ldap/bootstrap.ldif:/ldifs/bootstrap.ldif:ro
-      - openldap-data:/bitnami/openldap
+      - ./ldap/bootstrap.ldif:/container/service/slapd/assets/config/bootstrap/ldif/custom/bootstrap.ldif:ro
+      - openldap-data:/var/lib/ldap
+      - openldap-config:/etc/ldap/slapd.d
     restart: on-failure
     healthcheck:
-      test: ["CMD-SHELL", "ldapsearch -H ldap://localhost:1389 -x -D cn=admin,dc=securellm,dc=com -w ${LDAP_ADMIN_PASSWORD:-adminpassword} -b dc=securellm,dc=com > /dev/null 2>&1"]
+      test: ["CMD-SHELL", "ldapsearch -H ldap://localhost -x -D cn=admin,dc=securellm,dc=com -w ${LDAP_ADMIN_PASSWORD:-adminpassword} -b dc=securellm,dc=com > /dev/null 2>&1"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -49,7 +49,7 @@ services:
       AUTH_ISSUER_URI: http://auth-service:9000
       AUTH_CLIENT_ID: ${AUTH_CLIENT_ID:-ai-gateway-client}
       AUTH_CLIENT_SECRET: ${AUTH_CLIENT_SECRET:-secret}
-      LDAP_URL: ldap://openldap:1389
+      LDAP_URL: ldap://openldap:389
       LDAP_BASE: dc=securellm,dc=com
       LDAP_MANAGER_DN: cn=admin,dc=securellm,dc=com
       LDAP_MANAGER_PASSWORD: ${LDAP_ADMIN_PASSWORD:-adminpassword}
@@ -59,7 +59,7 @@ services:
     restart: on-failure
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:9000/actuator/health | grep -q '\"status\":\"UP\"'"]
-      interval: 10s
+      interval: 600s
       timeout: 5s
       retries: 5
       start_period: 20s
@@ -80,13 +80,13 @@ services:
       # Ollama
       OLLAMA_BASE_URL: http://ollama:11434
       OLLAMA_CLASSIFIER_MODEL: ${OLLAMA_CLASSIFIER_MODEL:-gemma3:1b}
-      OLLAMA_MODEL_PROGRAMMING: ${OLLAMA_MODEL_PROGRAMMING:-codellama:7b}
-      OLLAMA_MODEL_MATHEMATICS: ${OLLAMA_MODEL_MATHEMATICS:-qwen2.5-math:7b}
-      OLLAMA_MODEL_HISTORY: ${OLLAMA_MODEL_HISTORY:-llama3.2:3b}
-      OLLAMA_MODEL_SCIENCE: ${OLLAMA_MODEL_SCIENCE:-llama3.2:3b}
-      OLLAMA_MODEL_CREATIVE_WRITING: ${OLLAMA_MODEL_CREATIVE_WRITING:-mistral:7b}
-      OLLAMA_MODEL_LEGAL: ${OLLAMA_MODEL_LEGAL:-llama3.2:3b}
-      OLLAMA_MODEL_MEDICAL: ${OLLAMA_MODEL_MEDICAL:-llama3.2:3b}
+      OLLAMA_MODEL_PROGRAMMING: ${OLLAMA_MODEL_PROGRAMMING:-qwen2.5-coder:1.5b}
+      OLLAMA_MODEL_MATHEMATICS: ${OLLAMA_MODEL_MATHEMATICS:-deepseek-r1:1.5b}
+      OLLAMA_MODEL_HISTORY: ${OLLAMA_MODEL_HISTORY:-llama3.2:1b}
+      OLLAMA_MODEL_SCIENCE: ${OLLAMA_MODEL_SCIENCE:-llama3.2:1b}
+      OLLAMA_MODEL_CREATIVE_WRITING: ${OLLAMA_MODEL_CREATIVE_WRITING:-gemma3:1b}
+      OLLAMA_MODEL_LEGAL: ${OLLAMA_MODEL_LEGAL:-llama3.2:1b}
+      OLLAMA_MODEL_MEDICAL: ${OLLAMA_MODEL_MEDICAL:-llama3.2:1b}
       OLLAMA_MODEL_GENERAL: ${OLLAMA_MODEL_GENERAL:-gemma3:1b}
       OLLAMA_TIMEOUT_SECONDS: ${OLLAMA_TIMEOUT_SECONDS:-120}
 
@@ -102,8 +102,8 @@ services:
     depends_on:
       redis:
         condition: service_healthy
-      ollama:
-        condition: service_started
+      ollama-init:
+        condition: service_completed_successfully
       auth-service:
         condition: service_healthy
     restart: on-failure
@@ -147,6 +147,12 @@ services:
     volumes:
       - ollama-data:/root/.ollama
     restart: on-failure
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list > /dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     # GPU support (uncomment if you have an NVIDIA GPU + nvidia-container-toolkit)
     # deploy:
     #   resources:
@@ -156,7 +162,25 @@ services:
     #           count: all
     #           capabilities: [gpu]
 
+  # ── Ollama model init (pulls all required models on first run) ────────────
+  ollama-init:
+    image: ollama/ollama:latest
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    depends_on:
+      ollama:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        ollama pull gemma3:1b
+        ollama pull llama3.2:1b
+        ollama pull qwen2.5-coder:1.5b
+        ollama pull deepseek-r1:1.5b
+    restart: "no"
+
 volumes:
   redis-data:
   ollama-data:
   openldap-data:
+  openldap-config:

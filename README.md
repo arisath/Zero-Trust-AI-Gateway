@@ -1,6 +1,6 @@
 # Zero-Trust AI Gateway
 
-A secure, multi-module platform that sits in front of LLM services and enforces authentication, authorization, rate limiting, prompt security, and PII redaction on every request. All traffic is treated as untrusted regardless of origin.
+A secure, multi-module platform that sits in front of LLM services and enforces authentication, authorization, rate limiting, prompt security, and PII tokenization on every request. All traffic is treated as untrusted regardless of origin.
 
 ## Architecture
 
@@ -32,7 +32,7 @@ Browser / API client
 | Module | Port | Description |
 |---|---|---|
 | [`auth-service`](auth-service/README.md) | 9000 | OAuth2 Authorization Server — authenticates users via LDAP, issues signed JWTs with tier claim |
-| [`ai-gateway`](ai-gateway/README.md) | 8081 | Secure gateway — JWT validation, tier-based rate limiting, jailbreak detection, PII redaction, query classification, LLM routing |
+| [`ai-gateway`](ai-gateway/README.md) | 8081 | Secure gateway — JWT validation, tier-based rate limiting, jailbreak detection, PII tokenization/detokenization, query classification, LLM routing |
 
 ## Tech Stack
 

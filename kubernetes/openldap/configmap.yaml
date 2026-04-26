@@ -5,19 +5,113 @@ metadata:
   namespace: ai-gateway
 data:
   bootstrap.ldif: |
-    # Groups organizational unit
+    # Users OU
+    dn: ou=users,dc=securellm,dc=com
+    objectClass: organizationalUnit
+    ou: users
+
+    # Groups OU
     dn: ou=groups,dc=securellm,dc=com
     objectClass: organizationalUnit
     ou: groups
 
-    # Free tier group
+    # Free-tier users
+    dn: cn=alice,ou=users,dc=securellm,dc=com
+    objectClass: inetOrgPerson
+    cn: alice
+    sn: Smith
+    uid: alice
+    mail: alice@securellm.com
+    userPassword: alice123
+
+    dn: cn=charlie,ou=users,dc=securellm,dc=com
+    objectClass: inetOrgPerson
+    cn: charlie
+    sn: Brown
+    uid: charlie
+    mail: charlie@securellm.com
+    userPassword: charlie123
+
+    dn: cn=diana,ou=users,dc=securellm,dc=com
+    objectClass: inetOrgPerson
+    cn: diana
+    sn: Prince
+    uid: diana
+    mail: diana@securellm.com
+    userPassword: diana123
+
+    dn: cn=eve,ou=users,dc=securellm,dc=com
+    objectClass: inetOrgPerson
+    cn: eve
+    sn: Adams
+    uid: eve
+    mail: eve@securellm.com
+    userPassword: eve123
+
+    dn: cn=frank,ou=users,dc=securellm,dc=com
+    objectClass: inetOrgPerson
+    cn: frank
+    sn: Miller
+    uid: frank
+    mail: frank@securellm.com
+    userPassword: frank123
+
+    # Premium-tier users
+    dn: cn=bob,ou=users,dc=securellm,dc=com
+    objectClass: inetOrgPerson
+    cn: bob
+    sn: Jones
+    uid: bob
+    mail: bob@securellm.com
+    userPassword: bob123
+
+    dn: cn=grace,ou=users,dc=securellm,dc=com
+    objectClass: inetOrgPerson
+    cn: grace
+    sn: Hopper
+    uid: grace
+    mail: grace@securellm.com
+    userPassword: grace123
+
+    dn: cn=henry,ou=users,dc=securellm,dc=com
+    objectClass: inetOrgPerson
+    cn: henry
+    sn: Ford
+    uid: henry
+    mail: henry@securellm.com
+    userPassword: henry123
+
+    dn: cn=isabella,ou=users,dc=securellm,dc=com
+    objectClass: inetOrgPerson
+    cn: isabella
+    sn: Garcia
+    uid: isabella
+    mail: isabella@securellm.com
+    userPassword: isabella123
+
+    dn: cn=james,ou=users,dc=securellm,dc=com
+    objectClass: inetOrgPerson
+    cn: james
+    sn: Wilson
+    uid: james
+    mail: james@securellm.com
+    userPassword: james123
+
+    # Groups
     dn: cn=free,ou=groups,dc=securellm,dc=com
     objectClass: groupOfNames
     cn: free
     member: cn=alice,ou=users,dc=securellm,dc=com
+    member: cn=charlie,ou=users,dc=securellm,dc=com
+    member: cn=diana,ou=users,dc=securellm,dc=com
+    member: cn=eve,ou=users,dc=securellm,dc=com
+    member: cn=frank,ou=users,dc=securellm,dc=com
 
-    # Premium tier group
     dn: cn=premium,ou=groups,dc=securellm,dc=com
     objectClass: groupOfNames
     cn: premium
     member: cn=bob,ou=users,dc=securellm,dc=com
+    member: cn=grace,ou=users,dc=securellm,dc=com
+    member: cn=henry,ou=users,dc=securellm,dc=com
+    member: cn=isabella,ou=users,dc=securellm,dc=com
+    member: cn=james,ou=users,dc=securellm,dc=com

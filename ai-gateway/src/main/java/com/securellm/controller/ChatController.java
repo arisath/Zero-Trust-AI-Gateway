@@ -77,14 +77,14 @@ public class ChatController {
                 HttpStatus.FORBIDDEN, "Request blocked by security policy."));
         }
 
-        // Redact any PII in the prompt before sending it to the LLM
-        String safePrompt = piiDetectionService.redactPii(request.prompt());
+        // Tokenize PII in the prompt before sending to the LLM, then restore in the response
+        PiiDetectionService.TokenizedResult tokenized = piiDetectionService.tokenize(request.prompt());
 
-        return queryClassifierService.classify(safePrompt)
+        return queryClassifierService.classify(tokenized.text())
             .flatMap(category -> {
                 String targetModel = modelRoutingService.modelFor(category);
-                return llmService.processPrompt(safePrompt, targetModel)
-                    .map(piiDetectionService::redactPii)
+                return llmService.processPrompt(tokenized.text(), targetModel)
+                    .map(response -> piiDetectionService.detokenize(response, tokenized.tokenMap()))
                     .map(response -> new ChatResponse(response, category.name()));
             })
             .onErrorMap(ex -> !(ex instanceof ResponseStatusException), ex -> {

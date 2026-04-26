@@ -14,7 +14,7 @@ auth:
       secret: ${AUTH_CLIENT_SECRET:secret}
 
 ldap:
-  url: ${LDAP_URL:ldap://localhost:1389}
+  url: ${LDAP_URL:ldap://localhost:389}
   base: ${LDAP_BASE:dc=securellm,dc=com}
   manager-dn: ${LDAP_MANAGER_DN:cn=admin,dc=securellm,dc=com}
   manager-password: ${LDAP_MANAGER_PASSWORD:adminpassword}

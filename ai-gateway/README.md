@@ -16,8 +16,8 @@ Blocklist check          → 403 if matched
 Jailbreak detection      → 403 if matched
   │
   ▼
-PII redaction (prompt)
-  │
+PII tokenization         ← replaces PII with __PII_EMAIL_1__ style tokens
+  │                         stores token → original value map for this request
   ▼
 Query classification     ← small model (gemma3:1b) assigns a category
   │
@@ -25,16 +25,16 @@ Query classification     ← small model (gemma3:1b) assigns a category
 Model routing            ← maps category → specialist Ollama model
   │
   ▼
-LLM call
+LLM call                 ← receives tokenized prompt (no raw PII)
   │
   ▼
-PII redaction (response)
+PII detokenization       ← restores original values from token map
   │
   ▼
 { "response": "...", "category": "PROGRAMMING" }
 ```
 
-Proxied routes (`/api/llm/**`, `/api/secure-llm/**`) pass through the Spring Cloud Gateway filter chain: JWT auth → tier-aware rate limiting → jailbreak detection → PII redaction on response.
+Proxied routes (`/api/llm/**`, `/api/secure-llm/**`) pass through the Spring Cloud Gateway filter chain: JWT auth → tier-aware rate limiting → jailbreak detection.
 
 ## Security Layers
 
@@ -64,32 +64,34 @@ Scans the request body against 14 regex patterns covering:
 
 Returns `403 Forbidden` on a match.
 
-### 4. PII Redaction (PiiRedactorFilter)
-Redacts sensitive patterns from both prompts and responses:
+### 4. PII Tokenization (PiiDetectionService)
+Sensitive patterns in the prompt are replaced with reversible tokens before the text reaches the LLM. After the LLM responds, the original values are restored from the per-request token map. The LLM never sees raw PII.
 
-| Pattern | Placeholder |
+| Pattern | Token format |
 |---|---|
-| Email addresses | `[REDACTED-EMAIL]` |
-| US Social Security Numbers | `[REDACTED-SSN]` |
-| Credit / debit card numbers | `[REDACTED-CARD]` |
-| US phone numbers | `[REDACTED-PHONE]` |
-| IPv4 addresses | `[REDACTED-IP]` |
-| US ZIP codes | `[REDACTED-ZIP]` |
+| Email addresses | `__PII_EMAIL_N__` |
+| US Social Security Numbers | `__PII_SSN_N__` |
+| Credit / debit card numbers | `__PII_CARD_N__` |
+| US phone numbers (separator required) | `__PII_PHONE_N__` |
+| IPv4 addresses | `__PII_IP_N__` |
+| US ZIP+4 codes | `__PII_ZIP_N__` |
+
+`N` is a per-type counter so multiple occurrences of the same PII type in one prompt are each given a distinct token.
 
 ## Query Classification & Model Routing
 
 Queries are classified by a small model before being forwarded to the right specialist:
 
-| Category | Default model | Example queries |
-|---|---|---|
-| `PROGRAMMING` | `codellama:7b` | "Write a binary search in Java", "Debug this Python script" |
-| `MATHEMATICS` | `qwen2.5-math:7b` | "Solve x² + 2x − 3 = 0", "Prove that √2 is irrational" |
-| `HISTORY` | `llama3.2:3b` | "Why did the Roman Empire fall?" |
-| `SCIENCE` | `llama3.2:3b` | "How does photosynthesis work?" |
-| `CREATIVE_WRITING` | `mistral:7b` | "Write a short story about a lighthouse" |
-| `LEGAL` | `llama3.2:3b` | "What is the difference between civil and criminal law?" |
-| `MEDICAL` | `llama3.2:3b` | "What are the symptoms of appendicitis?" |
-| `GENERAL` | `gemma3:1b` | Anything that does not fit the above |
+| Category | Default model | Size | Example queries |
+|---|---|---|---|
+| `PROGRAMMING` | `qwen2.5-coder:1.5b` | ~1GB | "Write a binary search in Java", "Debug this Python script" |
+| `MATHEMATICS` | `deepseek-r1:1.5b` | ~1.1GB | "Solve x² + 2x − 3 = 0", "Prove that √2 is irrational" |
+| `HISTORY` | `llama3.2:1b` | ~1.3GB | "Why did the Roman Empire fall?" |
+| `SCIENCE` | `llama3.2:1b` | ~1.3GB | "How does photosynthesis work?" |
+| `CREATIVE_WRITING` | `gemma3:1b` | ~815MB | "Write a short story about a lighthouse" |
+| `LEGAL` | `llama3.2:1b` | ~1.3GB | "What is the difference between civil and criminal law?" |
+| `MEDICAL` | `llama3.2:1b` | ~1.3GB | "What are the symptoms of appendicitis?" |
+| `GENERAL` | `gemma3:1b` | ~815MB | Anything that does not fit the above |
 
 Classification failures always fall back to `GENERAL` — they never block the request.
 
@@ -130,7 +132,7 @@ Classification failures always fall back to `GENERAL` — they never block the r
 | `PREMIUM_MAX_REQUESTS_PER_MINUTE` | `60` | Request rate limit for premium-tier users |
 | `PREMIUM_MAX_TOKENS_PER_HOUR` | `100000` | Token rate limit for premium-tier users |
 | `JAILBREAK_DETECTION_ENABLED` | `true` | Toggle jailbreak filter |
-| `PII_REDACTION_ENABLED` | `true` | Toggle PII redaction filter |
+| `PII_REDACTION_ENABLED` | `true` | Toggle PII tokenization (prompt) and detokenization (response) |
 
 ### Profiles
 
