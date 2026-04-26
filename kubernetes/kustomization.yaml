@@ -3,6 +3,12 @@ kind: Kustomization
 
 resources:
   - namespace.yaml
+  # OpenLDAP (user directory — must start before auth-service)
+  - openldap/secret.yaml
+  - openldap/configmap.yaml
+  - openldap/pvc.yaml
+  - openldap/deployment.yaml
+  - openldap/service.yaml
   # Redis
   - redis/pvc.yaml
   - redis/deployment.yaml

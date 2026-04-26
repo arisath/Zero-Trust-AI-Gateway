@@ -26,6 +26,12 @@ spec:
           env:
             - name: AUTH_ISSUER_URI
               value: "http://auth-service:9000"
+            - name: LDAP_URL
+              value: "ldap://openldap:1389"
+            - name: LDAP_BASE
+              value: "dc=securellm,dc=com"
+            - name: LDAP_MANAGER_DN
+              value: "cn=admin,dc=securellm,dc=com"
           resources:
             requests:
               cpu: 150m

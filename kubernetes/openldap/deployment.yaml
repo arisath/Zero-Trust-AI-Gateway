@@ -1,0 +1,82 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: openldap
+  namespace: ai-gateway
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: openldap
+  template:
+    metadata:
+      labels:
+        app: openldap
+    spec:
+      containers:
+        - name: openldap
+          image: bitnami/openldap:latest
+          ports:
+            - containerPort: 1389
+          env:
+            - name: LDAP_ROOT
+              value: "dc=securellm,dc=com"
+            - name: LDAP_ADMIN_USERNAME
+              value: "admin"
+            - name: LDAP_USERS
+              value: "alice,bob"
+            - name: LDAP_CUSTOM_LDIF_DIR
+              value: "/ldifs"
+          envFrom:
+            - secretRef:
+                name: openldap-secret
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 300m
+              memory: 256Mi
+          volumeMounts:
+            - name: data
+              mountPath: /bitnami/openldap
+            - name: bootstrap
+              mountPath: /ldifs
+              readOnly: true
+          readinessProbe:
+            exec:
+              command:
+                - ldapsearch
+                - -H
+                - ldap://localhost:1389
+                - -x
+                - -b
+                - dc=securellm,dc=com
+                - -D
+                - cn=admin,dc=securellm,dc=com
+                - -w
+                - $(LDAP_ADMIN_PASSWORD)
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command:
+                - ldapsearch
+                - -H
+                - ldap://localhost:1389
+                - -x
+                - -b
+                - dc=securellm,dc=com
+                - -D
+                - cn=admin,dc=securellm,dc=com
+                - -w
+                - $(LDAP_ADMIN_PASSWORD)
+            initialDelaySeconds: 40
+            periodSeconds: 30
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: openldap-data
+        - name: bootstrap
+          configMap:
+            name: openldap-bootstrap
