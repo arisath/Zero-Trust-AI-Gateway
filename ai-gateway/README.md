@@ -1,6 +1,6 @@
 # ai-gateway
 
-Spring Cloud Gateway application that enforces multiple security layers on every LLM request and response. Classifies incoming queries and routes them to the appropriate specialist model.
+Spring Cloud Gateway application that enforces multiple security layers on every LLM request and response. Classifies incoming queries and routes them to the appropriate specialist model. Applies tier-aware rate limits based on the user's JWT claims.
 
 ## How It Works
 
@@ -34,19 +34,26 @@ PII redaction (response)
 { "response": "...", "category": "PROGRAMMING" }
 ```
 
-Proxied routes (`/api/llm/**`, `/api/secure-llm/**`) pass through the Spring Cloud Gateway filter chain: JWT auth → rate limiting → jailbreak detection → PII redaction on response.
+Proxied routes (`/api/llm/**`, `/api/secure-llm/**`) pass through the Spring Cloud Gateway filter chain: JWT auth → tier-aware rate limiting → jailbreak detection → PII redaction on response.
 
 ## Security Layers
 
 ### 1. Authentication
 JWT Bearer tokens validated against the auth-service JWKS endpoint. Active in `prod` profile only. The `local` profile disables auth entirely for development.
 
-### 2. Rate Limiting (TokenGuardFilter)
-Two independent Redis-backed sliding-window limits per user (resolved from JWT principal or `X-User-Id` header):
-- **Requests per minute** — `429` with `Retry-After: 60`
-- **Estimated tokens per hour** — `429` with `Retry-After: 3600`
+### 2. Tier-Based Rate Limiting (TokenGuardFilter)
+Two independent Redis-backed sliding-window limits per user, with limits that differ by tier:
 
-Fails open if Redis is unavailable.
+| Tier | Requests / minute | Tokens / hour |
+|---|---|---|
+| free | 10 | 10,000 |
+| premium | 60 | 100,000 |
+
+Tier is read from the `tier` JWT claim (set by the auth service at login from LDAP group membership). Defaults to `free` when no JWT is present (local profile or service-to-service calls).
+
+User identity is resolved from the JWT principal name, falling back to the `X-User-Id` header, then `anonymous`.
+
+Both limits return `429` with an appropriate `Retry-After` header. Fails open if Redis is unavailable.
 
 ### 3. Jailbreak Detection (JailbreakClassifierFilter)
 Scans the request body against 14 regex patterns covering:
@@ -101,6 +108,9 @@ Classification failures always fall back to `GENERAL` — they never block the r
 
 | Variable | Default | Description |
 |---|---|---|
+| `SPRING_PROFILES_ACTIVE` | `local` | `local` disables auth; `prod` enforces JWT |
+| `JWT_ISSUER_URI` | _(required in prod)_ | OIDC issuer URI |
+| `JWT_JWKS_URI` | _(required in prod)_ | JWKS endpoint URL |
 | `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama server URL |
 | `OLLAMA_CLASSIFIER_MODEL` | `gemma3:1b` | Model used to classify queries |
 | `OLLAMA_MODEL_PROGRAMMING` | `codellama:7b` | Model for programming queries |
@@ -115,12 +125,12 @@ Classification failures always fall back to `GENERAL` — they never block the r
 | `REDIS_HOST` | `localhost` | Redis host |
 | `REDIS_PORT` | `6379` | Redis port |
 | `REDIS_PASSWORD` | _(empty)_ | Redis password |
-| `MAX_REQUESTS_PER_MINUTE` | `60` | Per-user request rate limit |
-| `MAX_TOKENS_PER_HOUR` | `100000` | Per-user token rate limit |
+| `FREE_MAX_REQUESTS_PER_MINUTE` | `10` | Request rate limit for free-tier users |
+| `FREE_MAX_TOKENS_PER_HOUR` | `10000` | Token rate limit for free-tier users |
+| `PREMIUM_MAX_REQUESTS_PER_MINUTE` | `60` | Request rate limit for premium-tier users |
+| `PREMIUM_MAX_TOKENS_PER_HOUR` | `100000` | Token rate limit for premium-tier users |
 | `JAILBREAK_DETECTION_ENABLED` | `true` | Toggle jailbreak filter |
 | `PII_REDACTION_ENABLED` | `true` | Toggle PII redaction filter |
-| `JWT_ISSUER_URI` | _(required in prod)_ | OIDC issuer URI |
-| `JWT_JWKS_URI` | _(required in prod)_ | JWKS endpoint URL |
 
 ### Profiles
 
@@ -140,7 +150,7 @@ ollama pull gemma3:1b
 # Run (auth disabled)
 mvn spring-boot:run
 
-# Run in prod mode (JWT enforced — auth-service must be running)
+# Run in prod mode (JWT enforced — auth-service + OpenLDAP must be running)
 SPRING_PROFILES_ACTIVE=prod \
   JWT_ISSUER_URI=http://localhost:9000 \
   JWT_JWKS_URI=http://localhost:9000/oauth2/jwks \
@@ -150,6 +160,7 @@ SPRING_PROFILES_ACTIVE=prod \
 ## Example Requests
 
 ```bash
+# Local profile — no token needed
 curl -X POST http://localhost:8081/api/chat \
   -H "Content-Type: application/json" \
   -d '{"prompt": "Write a quicksort algorithm in Python."}'
@@ -160,6 +171,19 @@ curl -X POST http://localhost:8081/api/chat \
   "response": "def quicksort(arr): ...",
   "category": "PROGRAMMING"
 }
+```
+
+```bash
+# Prod profile — obtain token first (e.g. as bob, who is premium)
+TOKEN=$(curl -s -X POST http://localhost:9000/oauth2/token \
+  -u ai-gateway-client:secret \
+  -d "grant_type=client_credentials&scope=gateway.read" \
+  | jq -r .access_token)
+
+curl -X POST http://localhost:8081/api/chat \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"prompt": "Explain the Riemann hypothesis."}'
 ```
 
 ## Running Tests
@@ -180,7 +204,7 @@ src/main/java/com/securellm/
 │   ├── ChatController.java           POST /api/chat
 │   └── ConnectivityController.java   GET /api/v1/check-connectivity
 ├── filter/
-│   ├── TokenGuardFilter.java
+│   ├── TokenGuardFilter.java         tier-aware rate limiting
 │   ├── JailbreakClassifierFilter.java
 │   └── PiiRedactorFilter.java
 └── service/
@@ -190,5 +214,5 @@ src/main/java/com/securellm/
     ├── QueryCategory.java            enum of supported categories
     ├── JailbreakDetectionService.java
     ├── PiiDetectionService.java
-    └── TokenUsageService.java
+    └── TokenUsageService.java        tier-based Redis rate limiter
 ```
