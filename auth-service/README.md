@@ -4,6 +4,9 @@ OAuth2 Authorization Server for the Zero-Trust AI Gateway. Authenticates users a
 
 Built on [Spring Authorization Server](https://spring.io/projects/spring-authorization-server).
 
+> This service is part of the `auth` Docker Compose profile. It does not start by default.
+> Use `docker compose --profile auth up` with `SPRING_PROFILES_ACTIVE=prod` to enable full auth.
+
 ## How Authentication Works
 
 User identity and tier come from OpenLDAP:

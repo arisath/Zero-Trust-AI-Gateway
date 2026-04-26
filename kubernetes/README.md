@@ -56,8 +56,8 @@ kubectl apply -k kubernetes/
 
 ```bash
 kubectl -n ai-gateway exec deploy/ollama -- ollama pull gemma3:1b
-kubectl -n ai-gateway exec deploy/ollama -- ollama pull codellama:7b
-kubectl -n ai-gateway exec deploy/ollama -- ollama pull llama3.2:3b
+kubectl -n ai-gateway exec deploy/ollama -- ollama pull qwen2.5-coder:1.5b
+kubectl -n ai-gateway exec deploy/ollama -- ollama pull deepseek-r1:1.5b
 ```
 
 ## Verify

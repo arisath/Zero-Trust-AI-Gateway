@@ -84,14 +84,16 @@ Queries are classified by a small model before being forwarded to the right spec
 
 | Category | Default model | Size | Example queries |
 |---|---|---|---|
-| `PROGRAMMING` | `qwen2.5-coder:1.5b` | ~1GB | "Write a binary search in Java", "Debug this Python script" |
-| `MATHEMATICS` | `deepseek-r1:1.5b` | ~1.1GB | "Solve x² + 2x − 3 = 0", "Prove that √2 is irrational" |
-| `HISTORY` | `llama3.2:1b` | ~1.3GB | "Why did the Roman Empire fall?" |
-| `SCIENCE` | `llama3.2:1b` | ~1.3GB | "How does photosynthesis work?" |
-| `CREATIVE_WRITING` | `gemma3:1b` | ~815MB | "Write a short story about a lighthouse" |
-| `LEGAL` | `llama3.2:1b` | ~1.3GB | "What is the difference between civil and criminal law?" |
-| `MEDICAL` | `llama3.2:1b` | ~1.3GB | "What are the symptoms of appendicitis?" |
-| `GENERAL` | `gemma3:1b` | ~815MB | Anything that does not fit the above |
+| `PROGRAMMING` | `qwen2.5-coder:1.5b` | ~1.0 GiB | "Write a binary search in Java", "Debug this Python script" |
+| `MATHEMATICS` | `deepseek-r1:1.5b` | ~1.04 GiB | "Solve x² + 2x − 3 = 0", "Prove that √2 is irrational" |
+| `HISTORY` | `deepseek-r1:1.5b` | ~1.04 GiB | "Why did the Roman Empire fall?" |
+| `SCIENCE` | `deepseek-r1:1.5b` | ~1.04 GiB | "How does photosynthesis work?" |
+| `CREATIVE_WRITING` | `gemma3:1b` | ~815 MiB | "Write a short story about a lighthouse" |
+| `LEGAL` | `gemma3:1b` | ~815 MiB | "What is the difference between civil and criminal law?" |
+| `MEDICAL` | `gemma3:1b` | ~815 MiB | "What are the symptoms of appendicitis?" |
+| `GENERAL` | `gemma3:1b` | ~815 MiB | Anything that does not fit the above |
+
+Three models are loaded into Ollama: `gemma3:1b`, `qwen2.5-coder:1.5b`, and `deepseek-r1:1.5b`. All are kept resident in memory (`OLLAMA_KEEP_ALIVE=-1`) to avoid cold-load latency between requests.
 
 Classification failures always fall back to `GENERAL` — they never block the request.
 
@@ -115,15 +117,15 @@ Classification failures always fall back to `GENERAL` — they never block the r
 | `JWT_JWKS_URI` | _(required in prod)_ | JWKS endpoint URL |
 | `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama server URL |
 | `OLLAMA_CLASSIFIER_MODEL` | `gemma3:1b` | Model used to classify queries |
-| `OLLAMA_MODEL_PROGRAMMING` | `codellama:7b` | Model for programming queries |
-| `OLLAMA_MODEL_MATHEMATICS` | `qwen2.5-math:7b` | Model for mathematics queries |
-| `OLLAMA_MODEL_HISTORY` | `llama3.2:3b` | Model for history queries |
-| `OLLAMA_MODEL_SCIENCE` | `llama3.2:3b` | Model for science queries |
-| `OLLAMA_MODEL_CREATIVE_WRITING` | `mistral:7b` | Model for creative writing queries |
-| `OLLAMA_MODEL_LEGAL` | `llama3.2:3b` | Model for legal queries |
-| `OLLAMA_MODEL_MEDICAL` | `llama3.2:3b` | Model for medical queries |
+| `OLLAMA_MODEL_PROGRAMMING` | `qwen2.5-coder:1.5b` | Model for programming queries |
+| `OLLAMA_MODEL_MATHEMATICS` | `deepseek-r1:1.5b` | Model for mathematics queries |
+| `OLLAMA_MODEL_HISTORY` | `deepseek-r1:1.5b` | Model for history queries |
+| `OLLAMA_MODEL_SCIENCE` | `deepseek-r1:1.5b` | Model for science queries |
+| `OLLAMA_MODEL_CREATIVE_WRITING` | `gemma3:1b` | Model for creative writing queries |
+| `OLLAMA_MODEL_LEGAL` | `gemma3:1b` | Model for legal queries |
+| `OLLAMA_MODEL_MEDICAL` | `gemma3:1b` | Model for medical queries |
 | `OLLAMA_MODEL_GENERAL` | `gemma3:1b` | Model for general / unclassified queries |
-| `OLLAMA_TIMEOUT_SECONDS` | `120` | Request timeout |
+| `OLLAMA_TIMEOUT_SECONDS` | `300` | Request timeout (local CPU inference can be slow) |
 | `REDIS_HOST` | `localhost` | Redis host |
 | `REDIS_PORT` | `6379` | Redis port |
 | `REDIS_PASSWORD` | _(empty)_ | Redis password |
@@ -146,8 +148,10 @@ Classification failures always fall back to `GENERAL` — they never block the r
 Prerequisites: Java 17, Maven 3.x, Ollama running, Redis running.
 
 ```bash
-# Pull at least one model
+# Pull the three required models
 ollama pull gemma3:1b
+ollama pull qwen2.5-coder:1.5b
+ollama pull deepseek-r1:1.5b
 
 # Run (auth disabled)
 mvn spring-boot:run
@@ -158,6 +162,8 @@ SPRING_PROFILES_ACTIVE=prod \
   JWT_JWKS_URI=http://localhost:9000/oauth2/jwks \
   mvn spring-boot:run
 ```
+
+Prefer Docker Compose for local development — see the root README for the two startup modes (with and without auth).
 
 ## Example Requests
 
