@@ -1,7 +1,14 @@
+# Usage:
+#   No auth (local dev):  docker compose up
+#   Full auth (OAuth2+LDAP): docker compose --profile auth up
+#
+# When running with --profile auth, set SPRING_PROFILES_ACTIVE=prod to enforce JWT validation.
+
 services:
 
   # ── OpenLDAP (user directory) ─────────────────────────────────────────────
   openldap:
+    profiles: [auth]
     image: osixia/openldap:latest
     ports:
       - "389:389"
@@ -27,6 +34,7 @@ services:
 
   # ── phpLDAPadmin (LDAP web UI) ────────────────────────────────────────────
   phpldapadmin:
+    profiles: [auth]
     image: osixia/phpldapadmin:latest
     ports:
       - "8090:80"
@@ -40,6 +48,7 @@ services:
 
   # ── Auth Service ─────────────────────────────────────────────────────────
   auth-service:
+    profiles: [auth]
     build:
       context: .
       dockerfile: auth-service/Dockerfile
@@ -82,13 +91,13 @@ services:
       OLLAMA_CLASSIFIER_MODEL: ${OLLAMA_CLASSIFIER_MODEL:-gemma3:1b}
       OLLAMA_MODEL_PROGRAMMING: ${OLLAMA_MODEL_PROGRAMMING:-qwen2.5-coder:1.5b}
       OLLAMA_MODEL_MATHEMATICS: ${OLLAMA_MODEL_MATHEMATICS:-deepseek-r1:1.5b}
-      OLLAMA_MODEL_HISTORY: ${OLLAMA_MODEL_HISTORY:-llama3.2:1b}
-      OLLAMA_MODEL_SCIENCE: ${OLLAMA_MODEL_SCIENCE:-llama3.2:1b}
+      OLLAMA_MODEL_HISTORY: ${OLLAMA_MODEL_HISTORY:-deepseek-r1:1.5b}
+      OLLAMA_MODEL_SCIENCE: ${OLLAMA_MODEL_SCIENCE:-deepseek-r1:1.5b}
       OLLAMA_MODEL_CREATIVE_WRITING: ${OLLAMA_MODEL_CREATIVE_WRITING:-gemma3:1b}
-      OLLAMA_MODEL_LEGAL: ${OLLAMA_MODEL_LEGAL:-llama3.2:1b}
-      OLLAMA_MODEL_MEDICAL: ${OLLAMA_MODEL_MEDICAL:-llama3.2:1b}
+      OLLAMA_MODEL_LEGAL: ${OLLAMA_MODEL_LEGAL:-gemma3:1b}
+      OLLAMA_MODEL_MEDICAL: ${OLLAMA_MODEL_MEDICAL:-gemma3:1b}
       OLLAMA_MODEL_GENERAL: ${OLLAMA_MODEL_GENERAL:-gemma3:1b}
-      OLLAMA_TIMEOUT_SECONDS: ${OLLAMA_TIMEOUT_SECONDS:-120}
+      OLLAMA_TIMEOUT_SECONDS: ${OLLAMA_TIMEOUT_SECONDS:-300}
 
       # Redis
       REDIS_HOST: redis
@@ -104,8 +113,6 @@ services:
         condition: service_healthy
       ollama-init:
         condition: service_completed_successfully
-      auth-service:
-        condition: service_healthy
     restart: on-failure
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8081/actuator/health | grep -q '\"status\":\"UP\"'"]
@@ -146,6 +153,9 @@ services:
       - "11434:11434"
     volumes:
       - ollama-data:/root/.ollama
+    environment:
+      OLLAMA_KEEP_ALIVE: -1
+      OLLAMA_MAX_LOADED_MODELS: 3
     restart: on-failure
     healthcheck:
       test: ["CMD-SHELL", "bash -c 'cat < /dev/null > /dev/tcp/localhost/11434'"]
@@ -174,9 +184,12 @@ services:
     command:
       - |
         ollama pull gemma3:1b
-        ollama pull llama3.2:1b
         ollama pull qwen2.5-coder:1.5b
         ollama pull deepseek-r1:1.5b
+        wget -qO- --post-data='{"model":"gemma3:1b","prompt":"hi","stream":false,"options":{"num_predict":1}}' --header='Content-Type: application/json' http://ollama:11434/api/generate &
+        wget -qO- --post-data='{"model":"qwen2.5-coder:1.5b","prompt":"hi","stream":false,"options":{"num_predict":1}}' --header='Content-Type: application/json' http://ollama:11434/api/generate &
+        wget -qO- --post-data='{"model":"deepseek-r1:1.5b","prompt":"hi","stream":false,"options":{"num_predict":1}}' --header='Content-Type: application/json' http://ollama:11434/api/generate &
+        wait
     restart: "no"
 
 volumes:

@@ -42,7 +42,7 @@ Browser / API client
 | Auth server | Spring Authorization Server |
 | User directory | OpenLDAP (bitnami/openldap) |
 | Token validation | Spring Security OAuth2 Resource Server (JWKS) |
-| LLM | Ollama |
+| LLM | Ollama (`gemma3:1b`, `qwen2.5-coder:1.5b`, `deepseek-r1:1.5b`) |
 | Rate limiting | Redis Reactive (per-tier limits) |
 | Observability | Spring Boot Actuator + Micrometer + Prometheus |
 | Containers | Docker / Kubernetes |
@@ -51,24 +51,37 @@ Browser / API client
 
 ### Docker Compose
 
+The stack has two modes controlled by Docker Compose profiles:
+
+#### No auth — local development (default)
+
+Starts the gateway, Redis, and Ollama only. Auth is disabled — no token required.
+
 ```bash
-# 1. Start all services (gateway + auth + LDAP + Redis + Ollama)
 docker compose up --build
-
-# 2. Pull the classifier model into Ollama
-docker compose exec ollama ollama pull gemma3:1b
-
-# 3. Services are ready:
-#    Gateway:       http://localhost:8081
-#    Auth server:   http://localhost:9000
-#    phpLDAPadmin:  http://localhost:8090
 ```
 
-By default the gateway runs in `local` profile (auth disabled). To enable JWT enforcement:
+Services available:
+- Gateway: `http://localhost:8081`
 
 ```bash
-SPRING_PROFILES_ACTIVE=prod docker compose up --build
+curl http://localhost:8081/api/chat \
+  -H "Content-Type: application/json" \
+  -d '{"prompt": "Explain zero-trust security."}'
 ```
+
+#### Full auth — OAuth2 + LDAP
+
+Adds OpenLDAP, phpLDAPadmin, and the auth-service. JWT validation is enforced.
+
+```bash
+SPRING_PROFILES_ACTIVE=prod docker compose --profile auth up --build
+```
+
+Services available:
+- Gateway: `http://localhost:8081`
+- Auth server: `http://localhost:9000`
+- phpLDAPadmin: `http://localhost:8090`
 
 #### Getting a token (service-to-service)
 
@@ -110,7 +123,7 @@ Tier is determined by LDAP group membership (`cn=free` or `cn=premium` under `ou
 
 ## Managing Users
 
-phpLDAPadmin is available at `http://localhost:8090`.
+phpLDAPadmin is available at `http://localhost:8090` when running with `--profile auth`.
 
 - Login DN: `cn=admin,dc=securellm,dc=com`
 - Password: `adminpassword` (override with `LDAP_ADMIN_PASSWORD`)

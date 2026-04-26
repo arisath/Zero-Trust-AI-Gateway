@@ -79,6 +79,8 @@ public class ChatController {
 
         // Tokenize PII in the prompt before sending to the LLM, then restore in the response
         PiiDetectionService.TokenizedResult tokenized = piiDetectionService.tokenize(request.prompt());
+        log.info("Raw prompt: {}", request.prompt());
+        log.info("Prompt sent to LLM: {}", tokenized.text());
 
         return queryClassifierService.classify(tokenized.text())
             .flatMap(category -> {

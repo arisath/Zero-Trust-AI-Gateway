@@ -30,3 +30,8 @@ management:
   health:
     ldap:
       enabled: false
+
+logging:
+  level:
+    org.springframework.web: WARN
+    org.springframework.boot.actuate.endpoint.web: WARN
