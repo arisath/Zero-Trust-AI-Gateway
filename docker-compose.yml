@@ -1,5 +1,43 @@
 services:
 
+  # ── OpenLDAP (user directory) ─────────────────────────────────────────────
+  openldap:
+    image: bitnami/openldap:latest
+    ports:
+      - "1389:1389"
+    environment:
+      LDAP_ROOT: dc=securellm,dc=com
+      LDAP_ADMIN_USERNAME: admin
+      LDAP_ADMIN_PASSWORD: ${LDAP_ADMIN_PASSWORD:-adminpassword}
+      # Seed two users: alice (free tier) and bob (premium tier)
+      LDAP_USERS: alice,bob
+      LDAP_PASSWORDS: ${LDAP_USER_PASSWORDS:-alice123,bob123}
+      # bootstrap.ldif adds ou=groups and assigns each user to free/premium group
+      LDAP_CUSTOM_LDIF_DIR: /ldifs
+    volumes:
+      - ./ldap/bootstrap.ldif:/ldifs/bootstrap.ldif:ro
+      - openldap-data:/bitnami/openldap
+    restart: on-failure
+    healthcheck:
+      test: ["CMD-SHELL", "ldapsearch -H ldap://localhost:1389 -x -D cn=admin,dc=securellm,dc=com -w ${LDAP_ADMIN_PASSWORD:-adminpassword} -b dc=securellm,dc=com > /dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ── phpLDAPadmin (LDAP web UI) ────────────────────────────────────────────
+  phpldapadmin:
+    image: osixia/phpldapadmin:latest
+    ports:
+      - "8090:80"
+    environment:
+      PHPLDAPADMIN_LDAP_HOSTS: openldap
+      PHPLDAPADMIN_HTTPS: "false"
+    depends_on:
+      openldap:
+        condition: service_healthy
+    restart: on-failure
+
   # ── Auth Service ─────────────────────────────────────────────────────────
   auth-service:
     build:
@@ -11,8 +49,13 @@ services:
       AUTH_ISSUER_URI: http://auth-service:9000
       AUTH_CLIENT_ID: ${AUTH_CLIENT_ID:-ai-gateway-client}
       AUTH_CLIENT_SECRET: ${AUTH_CLIENT_SECRET:-secret}
-      AUTH_USER: ${AUTH_USER:-user}
-      AUTH_PASSWORD: ${AUTH_PASSWORD:-password}
+      LDAP_URL: ldap://openldap:1389
+      LDAP_BASE: dc=securellm,dc=com
+      LDAP_MANAGER_DN: cn=admin,dc=securellm,dc=com
+      LDAP_MANAGER_PASSWORD: ${LDAP_ADMIN_PASSWORD:-adminpassword}
+    depends_on:
+      openldap:
+        condition: service_healthy
     restart: on-failure
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:9000/actuator/health | grep -q '\"status\":\"UP\"'"]
@@ -51,9 +94,11 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
 
-      # Rate limits
-      MAX_REQUESTS_PER_MINUTE: ${MAX_REQUESTS_PER_MINUTE:-60}
-      MAX_TOKENS_PER_HOUR: ${MAX_TOKENS_PER_HOUR:-100000}
+      # Tier-based rate limits
+      FREE_MAX_REQUESTS_PER_MINUTE: ${FREE_MAX_REQUESTS_PER_MINUTE:-10}
+      FREE_MAX_TOKENS_PER_HOUR: ${FREE_MAX_TOKENS_PER_HOUR:-10000}
+      PREMIUM_MAX_REQUESTS_PER_MINUTE: ${PREMIUM_MAX_REQUESTS_PER_MINUTE:-60}
+      PREMIUM_MAX_TOKENS_PER_HOUR: ${PREMIUM_MAX_TOKENS_PER_HOUR:-100000}
     depends_on:
       redis:
         condition: service_healthy
@@ -104,3 +149,4 @@ services:
 volumes:
   redis-data:
   ollama-data:
+  openldap-data:

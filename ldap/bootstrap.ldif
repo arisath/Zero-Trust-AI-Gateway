@@ -1,0 +1,16 @@
+# Groups organizational unit
+dn: ou=groups,dc=securellm,dc=com
+objectClass: organizationalUnit
+ou: groups
+
+# Free tier group — members get basic rate limits
+dn: cn=free,ou=groups,dc=securellm,dc=com
+objectClass: groupOfNames
+cn: free
+member: cn=alice,ou=users,dc=securellm,dc=com
+
+# Premium tier group — members get elevated rate limits
+dn: cn=premium,ou=groups,dc=securellm,dc=com
+objectClass: groupOfNames
+cn: premium
+member: cn=bob,ou=users,dc=securellm,dc=com

@@ -18,8 +18,12 @@ spring:
 
 gateway:
   token-guard:
-    max-tokens-per-hour: ${MAX_TOKENS_PER_HOUR:100000}
-    max-requests-per-minute: ${MAX_REQUESTS_PER_MINUTE:60}
+    free:
+      max-requests-per-minute: ${FREE_MAX_REQUESTS_PER_MINUTE:10}
+      max-tokens-per-hour: ${FREE_MAX_TOKENS_PER_HOUR:10000}
+    premium:
+      max-requests-per-minute: ${PREMIUM_MAX_REQUESTS_PER_MINUTE:60}
+      max-tokens-per-hour: ${PREMIUM_MAX_TOKENS_PER_HOUR:100000}
   jailbreak:
     enabled: ${JAILBREAK_DETECTION_ENABLED:true}
   pii:

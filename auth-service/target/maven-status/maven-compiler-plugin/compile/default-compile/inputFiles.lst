@@ -1,3 +1,4 @@
 /Users/aristidisathanasiou/Documents/Code/Zero-Trust-AI-Gateway/auth-service/src/main/java/com/securellm/auth/config/AuthorizationServerConfig.java
 /Users/aristidisathanasiou/Documents/Code/Zero-Trust-AI-Gateway/auth-service/src/main/java/com/securellm/auth/AuthServiceApplication.java
+/Users/aristidisathanasiou/Documents/Code/Zero-Trust-AI-Gateway/auth-service/src/main/java/com/securellm/auth/config/LdapConfig.java
 /Users/aristidisathanasiou/Documents/Code/Zero-Trust-AI-Gateway/auth-service/src/main/java/com/securellm/auth/config/SecurityConfig.java

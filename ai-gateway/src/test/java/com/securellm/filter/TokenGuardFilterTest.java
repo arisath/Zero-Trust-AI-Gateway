@@ -17,9 +17,10 @@ import reactor.test.StepVerifier;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -43,8 +44,8 @@ class TokenGuardFilterTest {
     class WithinLimits {
         @Test
         void withinBothLimits_callsChain() {
-            when(tokenUsageService.isWithinRequestLimit(anyString())).thenReturn(Mono.just(true));
-            when(tokenUsageService.isWithinTokenLimit(anyString(), anyLong())).thenReturn(Mono.just(true));
+            when(tokenUsageService.isWithinRequestLimit(anyString(), anyString())).thenReturn(Mono.just(true));
+            when(tokenUsageService.isWithinTokenLimit(anyString(), anyLong(), anyString())).thenReturn(Mono.just(true));
             when(tokenUsageService.recordRequest(anyString())).thenReturn(Mono.empty());
             when(tokenUsageService.recordTokens(anyString(), anyLong())).thenReturn(Mono.empty());
 
@@ -67,7 +68,7 @@ class TokenGuardFilterTest {
     class RateLimitExceeded {
         @Test
         void requestLimitExceeded_returns429WithRetryAfter() {
-            when(tokenUsageService.isWithinRequestLimit(anyString())).thenReturn(Mono.just(false));
+            when(tokenUsageService.isWithinRequestLimit(anyString(), anyString())).thenReturn(Mono.just(false));
 
             MockServerWebExchange exchange = MockServerWebExchange.from(
                 MockServerHttpRequest.post("/api/llm/chat").build());
@@ -86,8 +87,8 @@ class TokenGuardFilterTest {
 
         @Test
         void tokenLimitExceeded_returns429WithRetryAfter() {
-            when(tokenUsageService.isWithinRequestLimit(anyString())).thenReturn(Mono.just(true));
-            when(tokenUsageService.isWithinTokenLimit(anyString(), anyLong())).thenReturn(Mono.just(false));
+            when(tokenUsageService.isWithinRequestLimit(anyString(), anyString())).thenReturn(Mono.just(true));
+            when(tokenUsageService.isWithinTokenLimit(anyString(), anyLong(), anyString())).thenReturn(Mono.just(false));
 
             MockServerWebExchange exchange = MockServerWebExchange.from(
                 MockServerHttpRequest.post("/api/llm/chat").build());
@@ -109,8 +110,8 @@ class TokenGuardFilterTest {
     class UserIdResolution {
         @Test
         void xUserIdHeader_usedAsIdentity() {
-            when(tokenUsageService.isWithinRequestLimit("custom-user")).thenReturn(Mono.just(true));
-            when(tokenUsageService.isWithinTokenLimit(anyString(), anyLong())).thenReturn(Mono.just(true));
+            when(tokenUsageService.isWithinRequestLimit(eq("custom-user"), anyString())).thenReturn(Mono.just(true));
+            when(tokenUsageService.isWithinTokenLimit(anyString(), anyLong(), anyString())).thenReturn(Mono.just(true));
             when(tokenUsageService.recordRequest(anyString())).thenReturn(Mono.empty());
             when(tokenUsageService.recordTokens(anyString(), anyLong())).thenReturn(Mono.empty());
 
@@ -124,8 +125,7 @@ class TokenGuardFilterTest {
                     .filter(exchange, ex -> Mono.empty()))
                 .verifyComplete();
 
-            // Verify the service was called with the header value
-            org.mockito.Mockito.verify(tokenUsageService).isWithinRequestLimit("custom-user");
+            verify(tokenUsageService).isWithinRequestLimit(eq("custom-user"), anyString());
         }
     }
 }

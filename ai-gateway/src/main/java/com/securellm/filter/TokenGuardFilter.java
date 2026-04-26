@@ -7,24 +7,26 @@ import org.springframework.cloud.gateway.filter.GatewayFilter;
 import org.springframework.cloud.gateway.filter.factory.AbstractGatewayFilterFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
 import java.nio.charset.StandardCharsets;
 
 /**
- * Enforces per-user rate limits before a request is forwarded to the LLM service.
+ * Enforces per-user, per-tier rate limits before a request is forwarded to the LLM service.
  *
  * User identity is resolved in order:
  *   1. JWT principal name (populated by Spring Security in production profile).
  *   2. X-User-Id request header (useful in local / service-to-service calls).
  *   3. Falls back to "anonymous".
  *
- * Two limits are checked:
- *   - Requests per minute  → HTTP 429 with Retry-After: 60
- *   - Estimated tokens per hour (derived from Content-Length, capped at 4096)
+ * Tier is extracted from the "tier" JWT claim (set by the auth service at login).
+ * Defaults to "free" when no JWT is present (local profile or service-to-service).
  *
- * A successful request is recorded in Redis asynchronously after the chain completes.
+ * Two limits are checked per tier:
+ *   - Requests per minute  → HTTP 429 with Retry-After: 60
+ *   - Estimated tokens per hour → HTTP 429 with Retry-After: 3600
  */
 @Component
 public class TokenGuardFilter extends AbstractGatewayFilterFactory<TokenGuardFilter.Config> {
@@ -44,7 +46,6 @@ public class TokenGuardFilter extends AbstractGatewayFilterFactory<TokenGuardFil
     @Override
     public GatewayFilter apply(Config config) {
         return (exchange, chain) -> {
-            // Resolve user identity
             Mono<String> userIdMono = exchange.getPrincipal()
                 .map(p -> p.getName())
                 .defaultIfEmpty(ANONYMOUS)
@@ -53,30 +54,40 @@ public class TokenGuardFilter extends AbstractGatewayFilterFactory<TokenGuardFil
                     return (header != null && !header.isBlank()) ? header : name;
                 });
 
-            // Estimate token count from Content-Length (rough approximation: 1 token ≈ 4 bytes)
+            Mono<String> tierMono = exchange.getPrincipal()
+                .filter(p -> p instanceof JwtAuthenticationToken)
+                .cast(JwtAuthenticationToken.class)
+                .map(jwt -> {
+                    String tier = jwt.getToken().getClaimAsString("tier");
+                    return tier != null ? tier : "free";
+                })
+                .defaultIfEmpty("free");
+
             long contentLength = exchange.getRequest().getHeaders().getContentLength();
             long estimatedTokens = Math.min(contentLength > 0 ? contentLength / 4 : 256, 4096);
 
-            return userIdMono.flatMap(userId ->
-                tokenUsageService.isWithinRequestLimit(userId)
-                    .flatMap(withinRequestLimit -> {
-                        if (!withinRequestLimit) {
-                            log.warn("Request rate limit exceeded for user={}", userId);
-                            return rejectWithTooManyRequests(exchange, "60");
-                        }
-                        return tokenUsageService.isWithinTokenLimit(userId, estimatedTokens)
-                            .flatMap(withinTokenLimit -> {
-                                if (!withinTokenLimit) {
-                                    log.warn("Token rate limit exceeded for user={}", userId);
-                                    return rejectWithTooManyRequests(exchange, "3600");
-                                }
-                                // Pass through, then record usage
-                                return chain.filter(exchange)
-                                    .then(tokenUsageService.recordRequest(userId))
-                                    .then(tokenUsageService.recordTokens(userId, estimatedTokens));
-                            });
-                    })
-            );
+            return Mono.zip(userIdMono, tierMono)
+                .flatMap(tuple -> {
+                    String userId = tuple.getT1();
+                    String tier = tuple.getT2();
+                    return tokenUsageService.isWithinRequestLimit(userId, tier)
+                        .flatMap(withinRequestLimit -> {
+                            if (!withinRequestLimit) {
+                                log.warn("Request rate limit exceeded for user={} tier={}", userId, tier);
+                                return rejectWithTooManyRequests(exchange, "60");
+                            }
+                            return tokenUsageService.isWithinTokenLimit(userId, estimatedTokens, tier)
+                                .flatMap(withinTokenLimit -> {
+                                    if (!withinTokenLimit) {
+                                        log.warn("Token rate limit exceeded for user={} tier={}", userId, tier);
+                                        return rejectWithTooManyRequests(exchange, "3600");
+                                    }
+                                    return chain.filter(exchange)
+                                        .then(tokenUsageService.recordRequest(userId))
+                                        .then(tokenUsageService.recordTokens(userId, estimatedTokens));
+                                });
+                        });
+                });
         };
     }
 
@@ -89,7 +100,5 @@ public class TokenGuardFilter extends AbstractGatewayFilterFactory<TokenGuardFil
         return exchange.getResponse().writeWith(Mono.just(buffer));
     }
 
-    public static class Config {
-        // Per-route overrides can be added here (e.g. custom limits per route)
-    }
+    public static class Config {}
 }

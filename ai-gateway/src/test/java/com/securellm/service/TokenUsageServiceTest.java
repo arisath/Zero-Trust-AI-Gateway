@@ -36,26 +36,46 @@ class TokenUsageServiceTest {
     void setUp() {
         when(redis.opsForValue()).thenReturn(valueOps);
         service = new TokenUsageService(redis);
-        ReflectionTestUtils.setField(service, "maxRequestsPerMinute", 60L);
-        ReflectionTestUtils.setField(service, "maxTokensPerHour", 100_000L);
+        ReflectionTestUtils.setField(service, "freeMaxRequestsPerMinute", 10L);
+        ReflectionTestUtils.setField(service, "premiumMaxRequestsPerMinute", 60L);
+        ReflectionTestUtils.setField(service, "freeMaxTokensPerHour", 10_000L);
+        ReflectionTestUtils.setField(service, "premiumMaxTokensPerHour", 100_000L);
     }
 
     @Nested
     class RequestLimit {
         @Test
-        void withinLimit_whenCountBelowMax() {
+        void withinLimit_whenPremiumCountBelowMax() {
             when(valueOps.get(anyString())).thenReturn(Mono.just("59"));
 
-            StepVerifier.create(service.isWithinRequestLimit("user1"))
+            StepVerifier.create(service.isWithinRequestLimit("user1", "premium"))
                 .expectNext(true)
                 .verifyComplete();
         }
 
         @Test
-        void exceededLimit_whenCountAtMax() {
+        void exceededLimit_whenPremiumCountAtMax() {
             when(valueOps.get(anyString())).thenReturn(Mono.just("60"));
 
-            StepVerifier.create(service.isWithinRequestLimit("user1"))
+            StepVerifier.create(service.isWithinRequestLimit("user1", "premium"))
+                .expectNext(false)
+                .verifyComplete();
+        }
+
+        @Test
+        void withinLimit_whenFreeCountBelowMax() {
+            when(valueOps.get(anyString())).thenReturn(Mono.just("9"));
+
+            StepVerifier.create(service.isWithinRequestLimit("user1", "free"))
+                .expectNext(true)
+                .verifyComplete();
+        }
+
+        @Test
+        void exceededLimit_whenFreeCountAtMax() {
+            when(valueOps.get(anyString())).thenReturn(Mono.just("10"));
+
+            StepVerifier.create(service.isWithinRequestLimit("user1", "free"))
                 .expectNext(false)
                 .verifyComplete();
         }
@@ -64,7 +84,7 @@ class TokenUsageServiceTest {
         void withinLimit_whenKeyMissingInRedis() {
             when(valueOps.get(anyString())).thenReturn(Mono.empty());
 
-            StepVerifier.create(service.isWithinRequestLimit("user1"))
+            StepVerifier.create(service.isWithinRequestLimit("user1", "free"))
                 .expectNext(true)
                 .verifyComplete();
         }
@@ -73,7 +93,7 @@ class TokenUsageServiceTest {
         void failsOpen_whenRedisErrors() {
             when(valueOps.get(anyString())).thenReturn(Mono.error(new RuntimeException("Redis down")));
 
-            StepVerifier.create(service.isWithinRequestLimit("user1"))
+            StepVerifier.create(service.isWithinRequestLimit("user1", "free"))
                 .expectNext(true)
                 .verifyComplete();
         }
@@ -82,19 +102,28 @@ class TokenUsageServiceTest {
     @Nested
     class TokenLimit {
         @Test
-        void withinLimit_whenSumBelowMax() {
+        void withinLimit_whenPremiumSumBelowMax() {
             when(valueOps.get(anyString())).thenReturn(Mono.just("50000"));
 
-            StepVerifier.create(service.isWithinTokenLimit("user1", 49999))
+            StepVerifier.create(service.isWithinTokenLimit("user1", 49999, "premium"))
                 .expectNext(true)
                 .verifyComplete();
         }
 
         @Test
-        void exceededLimit_whenSumExceedsMax() {
+        void exceededLimit_whenPremiumSumExceedsMax() {
             when(valueOps.get(anyString())).thenReturn(Mono.just("99000"));
 
-            StepVerifier.create(service.isWithinTokenLimit("user1", 1001))
+            StepVerifier.create(service.isWithinTokenLimit("user1", 1001, "premium"))
+                .expectNext(false)
+                .verifyComplete();
+        }
+
+        @Test
+        void exceededLimit_whenFreeSumExceedsMax() {
+            when(valueOps.get(anyString())).thenReturn(Mono.just("9500"));
+
+            StepVerifier.create(service.isWithinTokenLimit("user1", 501, "free"))
                 .expectNext(false)
                 .verifyComplete();
         }
@@ -103,7 +132,7 @@ class TokenUsageServiceTest {
         void failsOpen_whenRedisErrors() {
             when(valueOps.get(anyString())).thenReturn(Mono.error(new RuntimeException("Redis down")));
 
-            StepVerifier.create(service.isWithinTokenLimit("user1", 500))
+            StepVerifier.create(service.isWithinTokenLimit("user1", 500, "free"))
                 .expectNext(true)
                 .verifyComplete();
         }
